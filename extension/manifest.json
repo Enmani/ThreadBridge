@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ThreadBridge Local Sync",
-  "version": "0.8.0",
-  "description": "Sync your ChatGPT history to local SQLite through Native Messaging.",
+  "version": "0.9.0",
+  "description": "Sync ChatGPT, Claude and Gemini history to local SQLite through Native Messaging.",
   "minimum_chrome_version": "120",
   "permissions": [
     "nativeMessaging",
@@ -11,7 +11,9 @@
     "alarms"
   ],
   "host_permissions": [
-    "https://chatgpt.com/*"
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*"
   ],
   "background": {
     "service_worker": "background.js",

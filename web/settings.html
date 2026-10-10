@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ThreadBridge · 设置</title><link rel="stylesheet" href="/style.css"><script type="module" src="/settings.mjs"></script></head>
+<body><main>
+  <header><div class="brand-line"><h1 data-label="settings"></h1><span class="muted">ThreadBridge</span></div><div class="header-actions"><a class="button" href="/" data-label="backHistory"></a><button id="theme" data-label="theme" type="button"></button></div></header>
+  <section aria-labelledby="platform-heading" class="overview"><div class="table-heading"><h2 id="platform-heading" data-label="connectedPlatforms"></h2><button id="show-add" type="button" data-label="addPlatform" disabled></button></div>
+    <ul id="connections" class="connection-list" aria-live="polite"></ul><p id="settings-status" role="status" class="muted" data-label="loading"></p><p id="settings-error" role="alert" class="error" hidden></p>
+    <form id="add-form" hidden><div class="add-fields">
+      <label><span data-label="provider"></span><select id="add-provider" name="provider" required></select></label>
+      <label id="claude-field" hidden><span data-label="claudeOrganization"></span><input id="claude-workspace" name="workspace" type="text" maxlength="160" pattern="[A-Za-z0-9_-]+"><span class="muted" data-label="claudeOrganizationNote"></span></label>
+      <label id="gemini-field" hidden><span data-label="googleAccount"></span><input id="gemini-account" name="authuser" type="number" min="0" max="99" value="0"><span class="muted" data-label="googleAccountNote"></span></label>
+      <label id="chatgpt-field" hidden><span data-label="chatgptWorkspace"></span><input id="chatgpt-workspace" name="workspace" type="text" maxlength="160" pattern="[A-Za-z0-9_-]+"></label>
+    </div><div class="sync-actions"><button id="add-submit" type="submit" data-label="addConnect"></button><button id="cancel-add" type="button" data-label="cancel"></button></div></form>
+  </section>
+  <p class="muted" data-label="connectionNote"></p>
+</main></body></html>

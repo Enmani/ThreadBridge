@@ -2,16 +2,21 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {canonical} from './model.mjs';
+import {accountKey,providerId} from './providers.mjs';
+import {threadOrder} from './thread-order.mjs';
 import {migrateThreads} from './store-migrations.mjs';
 import {initializeBrowserArchive,readBrowserArchive} from './browser-archive.mjs';
 import {initializeImportedArchive,readImportedArchive,searchImportedText,additionalImportedMessages} from './imported-archive.mjs';
 
 export class Store {
-  transactionDepth=0;
-  constructor(file, account) {
+  transactionState={depth:0};
+  ownsDatabase=true;
+  get transactionDepth(){return this.transactionState.depth;}
+  set transactionDepth(value){this.transactionState.depth=value;}
+  constructor(file, account, provider='chatgpt') {
     if (!account || typeof account !== 'string') throw new Error('An explicit account namespace is required');
     if (file !== ':memory:') mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
-    this.account = account;
+    this.provider=providerId(provider);this.accountName=account;this.account=accountKey(provider,account);
     this.db = new DatabaseSync(file,{timeout:5000});
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
       CREATE TABLE IF NOT EXISTS meta(account TEXT, key TEXT, value TEXT, PRIMARY KEY(account,key));
@@ -33,7 +38,8 @@ export class Store {
     initializeBrowserArchive(this.db);
     initializeImportedArchive(this.db);
   }
-  close() { this.db.close(); }
+  close() { if(this.ownsDatabase)this.db.close(); }
+  scope(provider){const view=Object.create(this);view.provider=providerId(provider);view.account=accountKey(provider,this.accountName);view.ownsDatabase=false;return view;}
   transaction(fn) {
     const outer=this.transactionDepth===0,savepoint='nested_'+this.transactionDepth;
     this.db.exec(outer?'BEGIN IMMEDIATE':'SAVEPOINT '+savepoint);this.transactionDepth++;
@@ -47,7 +53,7 @@ export class Store {
   }
   discover(item, refresh=false) {
     const old=this.thread(item.id), json=canonical(item);
-    const pending = refresh || !old || old.coverage !== 'full-tree'
+    const pending = refresh || !old || (this.provider==='chatgpt'?old.coverage !== 'full-tree':old.revision===0)
       || (!item.updated&&!item.assistantUpdated&&(!old.last_checked_at||Date.now()-Date.parse(old.last_checked_at)>=86400000))
       || (item.updated!=null&&old.synced_updated!==item.updated) || (item.assistantUpdated!=null&&old.synced_assistant!==item.assistantUpdated);
     this.db.prepare(`INSERT INTO threads(account,id,title,summary,source_updated,source_assistant,pending) VALUES(?,?,?,?,?,?,?)
@@ -67,14 +73,14 @@ export class Store {
       .all(this.account,new Date(Date.now()-86400000).toISOString(),limit);
   }
   audit(before,limit=1){
-    const items=this.db.prepare(`SELECT id FROM threads WHERE account=? AND coverage='full-tree' AND pending=0
-      AND COALESCE(last_checked_at,'')<? ORDER BY last_checked_at,id LIMIT ?`).all(this.account,before,limit);
+    const items=this.db.prepare(`SELECT id FROM threads WHERE account=? AND revision>0 AND (coverage='full-tree' OR ?!='chatgpt') AND pending=0
+      AND COALESCE(last_checked_at,'')<? ORDER BY last_checked_at,id LIMIT ?`).all(this.account,this.provider,before,limit);
     for(const item of items)this.db.prepare('UPDATE threads SET pending=1 WHERE account=? AND id=?').run(this.account,item.id);return items.length;
   }
   projectIds() { return [...new Set([...JSON.parse(this.meta('projects') ?? '[]'),...this.db.prepare('SELECT summary FROM threads WHERE account=?').all(this.account)
     .map(r=>JSON.parse(r.summary ?? '{}').project)].filter(p=>typeof p==='string' && p.startsWith('g-p-')))]; }
   rememberProject(id,name){
-    if(typeof id!=='string'||!id.startsWith('g-p-')||typeof name!=='string'||!name.trim())return;
+    if(typeof id!=='string'||(this.provider==='chatgpt'?!id.startsWith('g-p-'):!/^[A-Za-z0-9_-]{1,160}$/.test(id))||typeof name!=='string'||!name.trim())return;
     const names=JSON.parse(this.meta('project_names') ?? '{}'),value=name.trim().slice(0,500);
     if(names[id]===value)return;names[id]=value;this.meta('project_names',JSON.stringify(names));
   }
@@ -168,7 +174,7 @@ export class Store {
   }
   status() {
     const scan=JSON.parse(this.meta('directory_scan') ?? 'null');
-    return {account:this.account,...this.db.prepare(`SELECT COUNT(*) AS threads,COALESCE(SUM(coverage='full-tree'),0) AS fullTrees,
+    return {account:this.accountName,provider:this.provider,...this.db.prepare(`SELECT COUNT(*) AS threads,COALESCE(SUM(coverage='full-tree'),0) AS fullTrees,
       COALESCE(SUM(pending),0) AS pending,COALESCE(SUM(error IS NOT NULL),0) AS errors FROM threads WHERE account=?`).get(this.account),
       messages:this.db.prepare('SELECT COUNT(*) AS n FROM messages WHERE account=?').get(this.account).n,
       lastCapture:JSON.parse(this.meta('last_capture') ?? 'null'),lastRequest:JSON.parse(this.meta('last_request') ?? 'null'),
@@ -185,23 +191,26 @@ export class Store {
         heartbeatAt:Number(this.meta('worker_heartbeat_at') ?? 0),nextRequestAt:Number(this.meta('next_request_at') ?? 0),
         paceMs:Number(this.meta('effective_pace_ms') ?? 0),lastRun:JSON.parse(this.meta('last_run') ?? 'null')}:null};
   }
-  listThreads({query='',page=1,limit=50}={}){
+  listThreads({query='',page=1,limit=50,sort='source_updated',order='desc'}={}){
     if(typeof query!=='string'||query.length>200||!Number.isSafeInteger(page)||page<1||page>1000000||!Number.isSafeInteger(limit)||limit<1||limit>200)throw new Error('Invalid thread list parameters');
     const term='%'+query.replace(/[\\%_]/g,'\\$&')+'%',where="account=? AND (title LIKE ? ESCAPE '\\' OR id LIKE ? ESCAPE '\\')",params=[this.account,term,term];
     const total=this.db.prepare('SELECT COUNT(*) AS n FROM threads WHERE '+where).get(...params).n;
     const rows=this.db.prepare(`SELECT t.id,t.title,t.coverage,t.revision,t.pending,t.error,t.source_updated,t.source_assistant,t.last_checked_at,t.summary,
       (SELECT COUNT(*) FROM messages m WHERE m.account=t.account AND m.thread=t.id) AS messages FROM threads t WHERE ${where}
-      ORDER BY MAX(COALESCE(source_updated,''),COALESCE(source_assistant,'')) DESC,id LIMIT ? OFFSET ?`).all(...params,limit,(page-1)*limit);
+      ORDER BY ${threadOrder(sort,order)} LIMIT ? OFFSET ?`).all(...params,limit,(page-1)*limit);
+    return {total,page,limit,pages:Math.max(1,Math.ceil(total/limit)),items:this.threadViews(rows)};
+  }
+  threadViews(rows){
     const names=JSON.parse(this.meta('project_names') ?? '{}');
-    return {total,page,limit,pages:Math.max(1,Math.ceil(total/limit)),items:rows.map(({summary,...row})=>{
-      const entry=JSON.parse(summary ?? '{}'),projectId=typeof entry.project==='string'&&entry.project.startsWith('g-p-')?entry.project:null;
+    return rows.map(({summary,...row})=>{
+      const entry=JSON.parse(summary ?? '{}'),projectId=typeof entry.project==='string'&&(this.provider!=='chatgpt'||entry.project.startsWith('g-p-'))?entry.project:null;
       const page=this.db.prepare('SELECT updated,revision FROM browser_archives WHERE account=? AND thread=?').get(this.account,row.id);
       const pageMessages=page?this.db.prepare('SELECT COUNT(*) AS n FROM browser_messages WHERE account=? AND thread=?').get(this.account,row.id).n:0;
       const imported=this.db.prepare('SELECT updated,revision FROM imported_archives WHERE account=? AND thread=?').get(this.account,row.id);
       const importedMessages=imported?this.db.prepare('SELECT COUNT(*) AS n FROM imported_messages WHERE account=? AND thread=?').get(this.account,row.id).n:0;
       return {...row,browserArchive:page?{...page,messages:pageMessages}:null,importedArchive:imported?{...imported,messages:importedMessages,additionalMessages:additionalImportedMessages(this,row.id)}:null,
         scope:entry.scope ?? null,projectId,projectName:projectId?names[projectId] ?? null:null};
-    })};
+    });
   }
   acquire(owner,ttl=120000) {
     return this.transaction(()=>{

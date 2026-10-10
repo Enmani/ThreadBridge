@@ -43,7 +43,7 @@ export async function serve(store,options={}) {
       if(request.id===undefined)continue;
       let result;
       switch(request.method) {
-        case 'initialize':result={protocolVersion:['2024-11-05','2025-03-26','2025-06-18'].includes(request.params?.protocolVersion)?request.params.protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'threadbridge',version:'0.8.0'}};break;
+        case 'initialize':result={protocolVersion:['2024-11-05','2025-03-26','2025-06-18'].includes(request.params?.protocolVersion)?request.params.protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'threadbridge',version:'0.9.0'}};break;
         case 'ping':result={};break;
         case 'tools/list':result={tools:options.localOnly?tools.filter(t=>t.name!=='sync_history'):tools};break;
         case 'tools/call':

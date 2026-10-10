@@ -8,6 +8,7 @@
 - [Directory and content modes](../ADR.md)
 - [Passive browser archive](../ADR-BROWSER-ARCHIVE.md)
 - [JSON import](../ADR-JSON-IMPORT.md)
+- [Provider isolation, connections and sorting](../ADR-PROVIDERS.md)
 - [Dashboard behavior](../DESIGN.md)
 - [Third-party notices](../THIRD-PARTY-NOTICES.md)
 - [Contributing](../CONTRIBUTING.md) and [open tasks](../TODO.md)

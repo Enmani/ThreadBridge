@@ -1,6 +1,6 @@
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export class ApiError extends Error {
-  constructor(status,path) { super(`ChatGPT request failed: HTTP ${status} ${path.split('?')[0]}`); this.status=status; }
+  constructor(status,path) { super(`History request failed: HTTP ${status} ${path.split('?')[0]}`); this.status=status; }
 }
 export function retryDelay(value,now=Date.now()) {
   if(value==null)return 0;const seconds=Number(value);
@@ -29,8 +29,9 @@ export class HttpTransport {
     if (!response.headers.get('content-type')?.includes('json')) throw new Error('Backend returned non-JSON data');
     return {status:response.status,data:await response.json()};
   }
+  allowsPath(path){return typeof path==='string'&&path.startsWith('/backend-api/');}
   async request(path,{method='GET',body}={}) {
-    if (!path.startsWith('/backend-api/')) throw new Error('Unsupported backend path');
+    if (!this.allowsPath(path)) throw new Error('Unsupported backend path');
     for (let attempt=0;attempt<=this.retries;attempt++) {
       if(this.stopped)throw this.stopped;
       await this.gate();if(this.stopped)throw this.stopped;const result=await this.once(path,method,body);

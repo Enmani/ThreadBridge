@@ -31,10 +31,10 @@ export class BrowserRpc {
     const pending=this.pending.get(message.id);if(!pending)return;this.pending.delete(message.id);clearTimeout(pending.timer);
     if(message.error)pending.reject(new Error('Browser request failed'));else pending.resolve(message.result);
   }
-  request(path,workspace){
+  request(path,workspace,provider='chatgpt',authuser=0){
     const id=++this.sequence;
     return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error('Browser request timed out'));},this.timeout);
-      this.pending.set(id,{resolve,reject,timer});try{this.send({type:'request',id,path,workspace:workspace ?? null});}catch(e){clearTimeout(timer);this.pending.delete(id);reject(e);}});
+      this.pending.set(id,{resolve,reject,timer});try{this.send({type:'request',id,path,workspace:workspace ?? null,provider,authuser});}catch(e){clearTimeout(timer);this.pending.delete(id);reject(e);}});
   }
   close(reason='Browser disconnected'){if(this.closed)return;this.closed=true;for(const p of this.pending.values()){clearTimeout(p.timer);p.reject(new Error(reason));}this.pending.clear();}
 }

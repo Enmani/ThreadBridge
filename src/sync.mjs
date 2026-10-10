@@ -1,6 +1,8 @@
 import {randomUUID} from 'node:crypto';
 import {snapshot} from './model.mjs';
 import {discover} from './discovery.mjs';
+import {discoverProvider} from './provider-discovery.mjs';
+import {providerSnapshot,detailPath} from './providers.mjs';
 
 async function workers(items,concurrency,fn,stopped=()=>false) {
   let index=0;
@@ -17,22 +19,23 @@ export async function sync(api,store,options={}) {
   const result={mode:options.directoryOnly?'ids':'full',discovery:null,fetched:0,changedMessages:0,failures:[],batchFallbacks:0};
   let stopped=null;
   try {
+    if(options.batch&&store.provider!=='chatgpt')throw new Error('Batch sync is only available for ChatGPT');
     const lastFull=store.meta('last_full_scan');
     const full=options.full || options.refresh || !lastFull || Date.now()-Date.parse(lastFull)>=86400000;
     const directoryStarted=performance.now();
-    result.discovery=options.skipDiscovery?JSON.parse(store.meta('discovery') ?? 'null'):await discover(api,store,{...options,full});
+    result.discovery=options.skipDiscovery?JSON.parse(store.meta('discovery') ?? 'null'):await (store.provider==='chatgpt'?discover:discoverProvider)(api,store,{...options,full});
     result.timings={directoryMs:Math.round(performance.now()-directoryStarted)};const detailsStarted=performance.now();
     if(!result.discovery)throw new Error('No directory scan to resume');
     stopped=api.stopped ?? null;
     const pending=options.directoryOnly?[]:store.pending(options.max ?? 100000);
     const save=(detail,item)=>{
       if(leaseError)throw leaseError;store.acquire(owner);
-      const parsed=snapshot(detail,item.id);
+      const parsed=providerSnapshot(store.provider,detail,item.id,item.title);
       const change=store.save(parsed,item.source_updated,item.source_assistant); result.fetched++;result.changedMessages+=change.changed;
     };
     const single=async item=>{
       if (leaseError) throw leaseError;
-      try {save(await api.request(`/backend-api/conversation/${encodeURIComponent(item.id)}`),item);if(api.stopped)stopped=api.stopped;}
+      try {save(await api.request(detailPath(store.provider,item.id)),item);if(api.stopped)stopped=api.stopped;}
       catch(e) {if(e.code==='SYNC_PAUSED'){stopped=e;return;}store.fail(item.id,e.message);result.failures.push({id:item.id,error:e.message});if(api.stopped)stopped=api.stopped;else if([401,403,429].includes(e.status))stopped=e;}
     };
     if (options.batch) {
