@@ -2,7 +2,10 @@ param(
   [Parameter(Mandatory=$true)][ValidatePattern('^[a-p]{32}$')][string]$ExtensionId,
   [ValidateSet('Chrome','Edge')][string]$Browser='Chrome',
   [ValidatePattern('^[A-Za-z0-9_-]{1,80}$')][string]$Account='personal',
-  [string]$Workspace=''
+  [string]$Workspace='',
+  [ValidateSet('chatgpt','claude','gemini')][string[]]$Providers=@('chatgpt'),
+  [ValidatePattern('^$|^[A-Za-z0-9_-]{1,160}$')][string]$ClaudeOrganization='',
+  [ValidateRange(0,99)][int]$GeminiAccount=0
 )
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -13,8 +16,16 @@ if($Workspace -and $Workspace -notmatch '^[A-Za-z0-9_-]{1,160}$'){throw 'Invalid
 $data=Join-Path $projectRoot 'data';New-Item -ItemType Directory -Path $data -Force | Out-Null
 $configPath=Join-Path $data 'native-config.json';$launcher=Join-Path $data 'native-host.cmd';$manifestPath=Join-Path $data 'native-host.json'
 $workspaceValue=$null;if($Workspace){$workspaceValue=$Workspace}
+if(!$Providers.Count -or @($Providers | Select-Object -Unique).Count -ne $Providers.Count){throw 'Choose each provider once.'}
+$providerConfigs=@(foreach($provider in $Providers){
+  $entry=@{provider=$provider}
+  if($provider -eq 'chatgpt'){$entry.workspace=$workspaceValue}
+  if($provider -eq 'claude' -and $ClaudeOrganization){$entry.workspace=$ClaudeOrganization}
+  if($provider -eq 'gemini'){$entry.authuser=$GeminiAccount}
+  $entry
+})
 $config=@{extensionId=$ExtensionId;account=$Account;db=(Join-Path $data 'history.sqlite');workspace=$workspaceValue;
-  paceMs=90000;directoryIntervalMs=900000;projectIntervalMs=3600000;maxDirectoryPages=3;pendingIntervalMs=15000;maxPerRun=5;cooldownMs=120000}
+  providers=$providerConfigs;paceMs=90000;directoryIntervalMs=900000;projectIntervalMs=3600000;maxDirectoryPages=3;pendingIntervalMs=15000;maxPerRun=5;cooldownMs=120000}
 [IO.File]::WriteAllText($configPath,($config | ConvertTo-Json),[Text.UTF8Encoding]::new($false))
 $command='@echo off'+[Environment]::NewLine+'"'+$runtime+'" "'+(Join-Path $projectRoot 'src\browser-host.mjs')+'" --config "'+$configPath+'" %*'+[Environment]::NewLine
 [IO.File]::WriteAllText($launcher,$command,[Text.Encoding]::Default)

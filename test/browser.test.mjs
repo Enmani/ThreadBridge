@@ -122,7 +122,7 @@ test('local-only Codex MCP exposes local tools and refuses online sync even when
     {jsonrpc:'2.0',id:4,method:'tools/call',params:{name:'list_threads',arguments:{page:1,limit:10}}}];
   const output=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['src/cli.mjs','serve','--local-only','--account','test','--db',f.db]);let text='',errors='';
     child.stdout.on('data',b=>text+=b);child.stderr.on('data',b=>errors+=b);child.on('error',reject);child.on('close',code=>code?reject(new Error(errors)):resolve(text));child.stdin.end(requests.map(JSON.stringify).join('\n')+'\n');});
-  const replies=output.trim().split('\n').map(JSON.parse);assert.equal(replies[0].result.tools.length,6);assert.equal(replies[0].result.tools.some(t=>t.name==='sync_history'),false);
+  const replies=output.trim().split('\n').map(JSON.parse);assert.equal(replies[0].result.tools.length,7);assert.equal(replies[0].result.tools.some(t=>t.name==='sync_history'),false);assert.ok(replies[0].result.tools.some(t=>t.name==='chat_index'));
   assert.equal(replies[1].result.isError,true);assert.match(replies[1].result.content[0].text,/local data only/);assert.equal(JSON.parse(replies[2].result.content[0].text).threads,0);
   assert.deepEqual(JSON.parse(replies[3].result.content[0].text).items,[]);assert.equal(f.requests.length,0);
 });

@@ -11,6 +11,7 @@ export function ids(value) {
   return [...new Set(list)];
 }
 export async function apiFor(store,options={}) {
+  if(store.provider!=='chatgpt')throw new Error('Claude and Gemini sync through the browser extension. Use the dashboard to start or resume.');
   const endpoint=options.cdp ?? process.env.CHATGPT_CDP_URL;
   const api=endpoint?await CdpTransport.connect(endpoint,process.env.CHATGPT_ACCOUNT_ID):new HttpTransport();
   try {
@@ -28,6 +29,7 @@ export async function runSync(store,options={}) {
     projectIds:options.projects?ids(options.projects):[]});}finally{api.close();}
 }
 export function importTrees(store,raw) {
+  if(store.provider!=='chatgpt')throw new Error('This importer accepts ChatGPT JSON only');
   const list=Array.isArray(raw)?raw:Array.isArray(raw?.conversations)?raw.conversations:[raw];
   let changedMessages=0;const errors=[];
   for(const tree of list){try{const id=tree?.conversation_id ?? tree?.id;const parsed=snapshot(tree,id);changedMessages+=store.save(parsed).changed;}

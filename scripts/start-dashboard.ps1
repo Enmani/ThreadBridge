@@ -4,7 +4,8 @@ $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $runtime=(Get-Command node -ErrorAction Stop).Source
 $configFile=Join-Path $projectRoot 'data/native-config.json'
 $databasePath=Join-Path $projectRoot 'data/history.sqlite';$accountName='personal'
-if(Test-Path -LiteralPath $configFile){$config=Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json;$databasePath=$config.db;$accountName=$config.account}
+if(Test-Path -LiteralPath $configFile){$config=Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json;$databasePath=$config.db;$accountName=$config.account
+}
 Push-Location $projectRoot
 try{
   & $runtime 'src/cli.mjs' status --db $databasePath --account $accountName | Out-Null
@@ -15,6 +16,7 @@ try{
   try{$status=Invoke-RestMethod -Uri "$url/api/status" -TimeoutSec 2}catch{}
   if($status){
     if($status.app -ne 'threadbridge' -or $status.account -ne $accountName){throw 'Port is occupied by another service or account. Choose another port.'}
+    if($status.provider -ne 'all'){throw 'An older dashboard is running. Stop it or choose another port.'}
     $running=$true
   }
   if(!$running){
