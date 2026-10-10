@@ -6,6 +6,9 @@
 - [ ] Establish Gemini long-conversation pagination before supporting responses at the 10,000-turn window. Current adapter rejects truncated windows and retains pending work.
 - [ ] Measure long-running incremental sync and full-account coverage against an independently known directory. Automated fixtures cannot establish remote completeness.
 - [ ] Measure binary indexing time, disk growth and query/summary usefulness on a real large local archive. Verify a real AI client's bottom-up summary workflow; synthetic tests establish mechanics only.
+- [ ] Verify real OpenAI, Claude and Gemini API connections, supported text models, quotas and summary quality with explicit test accounts. Local HTTP protocol fixtures establish request conversion, not live cloud compatibility.
+
+Local-model smoke check: the existing `qwen3.8-coder390` service completed a synthetic chat summary through the connection registry and worker. A 256-token output budget exhausted on reasoning; the compatible transport now reserves 1,024 tokens while retaining the 280-byte final-summary limit. This does not establish large-archive performance or semantic quality.
 - [ ] Add Native Messaging registration instructions and installers for macOS and Linux before claiming browser-sync installation support on those systems.
 
 Run `npm run precheck` for local changes. Do not place private transcripts or databases in verification records.

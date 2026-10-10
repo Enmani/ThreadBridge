@@ -1,6 +1,6 @@
 # 本地聊天二叉树
 
-用户要求沿用 OptMem 与 PaperTree 的逐层导航方式，让访问的 AI 根据需要补摘要。独立实现这一结构，保持原始 SQLite 存档为事实来源，不引入后台模型、向量数据库或第二份原始聊天库。
+沿用 OptMem 与 PaperTree 的逐层导航方式，保持原始 SQLite 存档为事实来源。摘要可由设置中选择的 API 或本地模型后台生成，也可由访问的 MCP AI 按需补充；模型接入见 [摘要模型连接](ADR-MODEL-CONNECTIONS.md)。不引入向量数据库或第二份原始聊天库。
 
 `chat-index-schema` 安装派生索引和待办触发器，既有存档首次启动时加入待办；触发器可捕捉其他本地进程写入的新版本。`chat-index-source` 读取各存档来源的全部保留版本，保存片段与来源定位。`chat-index` 发布二叉树、全文检索和摘要任务；`chat-index-interface` 约束 MCP/CLI 操作；设置接口与页面分别处理全局配置和状态。
 

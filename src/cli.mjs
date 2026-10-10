@@ -8,7 +8,7 @@ import {NativePipe,syncNative} from './native.mjs';
 import {serve} from './mcp.mjs';
 import {invokeIndex} from './chat-index-interface.mjs';
 
-const spec={};for(const key of ['action','generation','summary','budget','provider','sort','order','db','account','input','query','id','revision','consumer','limit','page','through','ids','caller','max-pages','concurrency','max','projects','cdp'])spec[key]={type:'string'};
+const spec={};for(const key of ['model-client','action','generation','summary','budget','provider','sort','order','db','account','input','query','id','revision','consumer','limit','page','through','ids','caller','max-pages','concurrency','max','projects','cdp'])spec[key]={type:'string'};
 for(const key of ['full','refresh','batch','help','local-only','pending'])spec[key]={type:'boolean'};
 let store;
 try {

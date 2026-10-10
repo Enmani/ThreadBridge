@@ -13,12 +13,28 @@
     </div><div class="sync-actions"><button id="add-submit" type="submit" data-label="addConnect"></button><button id="cancel-add" type="button" data-label="cancel"></button></div></form>
   </section>
   <p class="muted" data-label="connectionNote"></p>
+  <section aria-labelledby="model-heading" class="overview">
+    <div class="table-heading"><h2 id="model-heading" data-label="modelConnections"></h2><button id="show-model" type="button" data-label="addModel" disabled></button></div>
+    <ul id="model-connections" class="connection-list" aria-live="polite"></ul>
+    <p id="model-empty" class="muted" data-label="modelEmpty"></p><p id="model-error" class="error" role="alert" hidden></p>
+    <form id="model-form" hidden><div class="add-fields">
+      <label><span data-label="connectionName"></span><input id="model-name" required maxlength="80" placeholder="我的模型服务" autocomplete="off"></label>
+      <label><span data-label="connectionKind"></span><select id="model-kind"><option value="api" data-label="cloudApi"></option><option value="local" data-label="localModel"></option><option value="client" data-label="aiClient"></option></select></label>
+      <label id="model-protocol-field"><span data-label="modelService"></span><select id="model-protocol"><option value="openai">OpenAI</option><option value="anthropic">Claude</option><option value="gemini">Gemini</option><option value="compatible" data-label="compatibleApi"></option></select></label>
+      <label id="model-endpoint-field" hidden><span data-label="serviceAddress"></span><input id="model-endpoint" type="url" placeholder="https://api.example.com/v1" maxlength="1000"></label>
+      <label id="model-key-field"><span data-label="modelKey"></span><input id="model-key" type="password" autocomplete="new-password" maxlength="4096" spellcheck="false"><span class="muted" data-label="modelKeyNote"></span></label>
+    </div><p id="model-add-note" class="muted"></p><div class="sync-actions"><button id="save-model" type="submit" data-label="connectModel"></button><button id="cancel-model" type="button" data-label="cancel"></button></div></form>
+    <details id="client-setup" hidden><summary data-label="clientSetup"></summary><p class="muted" data-label="clientSetupNote"></p><pre id="client-config" tabindex="0"></pre><p data-label="clientTaskNote"></p><p data-label="clientWriteNote"></p><p class="muted" data-label="clientOnDemand"></p></details>
+  </section>
   <section aria-labelledby="index-heading" class="overview">
     <div class="table-heading"><div class="brand-line"><h2 id="index-heading" data-label="chatIndex"></h2><p class="muted" data-label="indexPurpose"></p></div><label class="watch-option"><input id="index-enabled" type="checkbox" role="switch" disabled><span data-label="indexEnabled"></span></label></div>
-    <div class="summary-line"><p id="index-state" role="status" data-label="loading"></p><p class="muted" data-label="indexSummaryMode"></p></div>
+    <div class="summary-line"><p id="index-state" role="status" data-label="loading"></p><p id="index-summary-mode" class="muted" data-label="indexSummaryMode"></p></div>
+    <div class="summary-controls"><label for="summary-model" data-label="summaryModel"></label><select id="summary-model" disabled></select><button id="summary-run" type="button" data-label="startSummary" disabled></button></div>
+    <p id="summary-status" role="status" class="muted"></p><p id="summary-destination" class="muted"></p><p id="summary-error" class="error" role="alert" hidden></p>
     <dl class="counts"><div><dt data-label="indexedChats"></dt><dd id="index-count">—</dd></div><div><dt data-label="pendingSummaries"></dt><dd id="index-summaries">—</dd></div><div><dt data-label="indexUpdated"></dt><dd id="index-updated">—</dd></div></dl>
     <p id="index-error" class="error" role="alert" hidden></p>
     <details class="index-maintenance"><summary data-label="indexMaintenance"></summary><p class="muted" data-label="indexPauseNote"></p><p class="muted" data-label="indexRebuildNote"></p><button id="index-rebuild" type="button" data-label="indexRebuild" disabled></button></details>
+    <details id="summary-quota"><summary data-label="summaryUsage"></summary><form id="summary-limit-form" class="summary-controls"><label for="summary-limit" data-label="dailyCalls"></label><input id="summary-limit" type="number" min="1" max="10000" required value="200"><button type="submit" data-label="saveLimit"></button></form><p class="muted" data-label="usageNote"></p><p id="summary-usage" class="muted"></p></details>
     <details><summary data-label="indexConnect"></summary><p class="muted" data-label="indexConnectNote"></p><a class="button" href="/chat-index-guide" target="_blank" rel="noopener" data-label="indexGuide"></a></details>
   </section>
 </main></body></html>

@@ -1,5 +1,5 @@
 import http from 'node:http';
-import {readFileSync} from 'node:fs';
+import {readFileSync,realpathSync} from 'node:fs';
 import {pauseRequested,syncMode,syncComplete,startSync,watchNewRequested,watchNewThreads,setSyncPaused} from './sync-control.mjs';
 import {browserArchiveEnabled} from './browser-archive.mjs';
 import {importJson,importLimit} from './json-import.mjs';
@@ -8,9 +8,12 @@ import {providerNames} from './providers.mjs';
 import {connections,addConnection,connectionStatus} from './connections.mjs';
 import {combinedThreads,combinedStatus} from './history-view.mjs';
 import {dashboardIndex,configureIndex,startIndexing} from './chat-index-dashboard.mjs';
+import {modelRequest} from './model-dashboard.mjs';
+import {startSummaries} from './summary-worker.mjs';
 
 const files=new Map([['/',['index.html','text/html']],['/settings',['settings.html','text/html']],['/settings.mjs',['settings.mjs','text/javascript']],['/theme.mjs',['theme.mjs','text/javascript']],['/sort-ui.mjs',['sort-ui.mjs','text/javascript']],['/floating-ui.mjs',['floating-ui.mjs','text/javascript']],['/app.mjs',['app.mjs','text/javascript']],['/import-ui.mjs',['import-ui.mjs','text/javascript']],['/labels.mjs',['labels.mjs','text/javascript']],['/style.css',['style.css','text/css']]]);
 files.set('/index-settings.mjs',['index-settings.mjs','text/javascript']);
+files.set('/model-settings.mjs',['model-settings.mjs','text/javascript']);
 export function dashboardStatus(store,now=Date.now()){
   const status=store.status(),worker=status.background,connected=Boolean(worker?.heartbeatAt&&now-worker.heartbeatAt<45000);
   const paused=pauseRequested(store),nextAt=connected&&!paused&&!['paused','account-changed'].includes(worker.state)?Math.max(worker.nextRunAt,worker.nextRequestAt):null;
@@ -26,9 +29,15 @@ async function readControl(request){
   return value;
 }
 export function createDashboard(source){
-  const stores=source instanceof Map?source:new Map([[source.provider,source]]),defaultProvider=stores.keys().next().value;
-  if(!stores.size)throw new Error('Dashboard needs a provider');
-  const root=stores.get('chatgpt')??stores.values().next().value,unified=source instanceof Map;
+  const requested=source instanceof Map?source:new Map([[source.provider,source]]),defaultProvider=requested.keys().next().value;
+  if(!requested.size)throw new Error('Dashboard needs a provider');
+  const root=requested.get('chatgpt')??requested.values().next().value,unified=source instanceof Map,stores=new Map();
+  for(const [provider,target] of requested){
+    const sameDatabase=target.db===root.db||(target.file!==':memory:'&&root.file!==':memory:'&&realpathSync(target.file)===realpathSync(root.file));
+    if(provider!==target.provider||target.accountName!==root.accountName||!sameDatabase)throw new Error('Dashboard stores must share the account and database');
+    // All local transactions use one connection, even if callers opened separate readers of the same file.
+    stores.set(provider,root.scope(provider));
+  }
   if(unified)connections(root);
   const activeStores=()=>unified?connections(root).map(c=>{const store=stores.get(c.provider);if(!store)throw new Error('Configured platform is unavailable');return store;}):[root];
   const status=store=>({...(store?dashboardStatus(store):combinedStatus(activeStores().map(s=>dashboardStatus(s)))),capabilities:{browserArchive:(store?[store]:activeStores()).some(s=>s.provider==='chatgpt'),jsonImport:stores.has('chatgpt')&&(!store||store.provider==='chatgpt')}});
@@ -43,11 +52,13 @@ export function createDashboard(source){
       const url=new URL(request.url,origin);
       const provider=url.searchParams.get('provider'),store=provider?stores.get(provider):unified?null:stores.get(defaultProvider);
       if(provider&&!store)return send(400,{error:'Provider is not configured'});
+      if(url.pathname==='/api/models')return send(200,await modelRequest(request,root,activeStores().map(s=>s.provider),origin,summaryWorker));
       if(url.pathname==='/api/index'){
         if(request.method==='POST'){
           if(request.headers.origin!==origin)return send(403,{error:'Same-origin settings required'});
           if(request.headers['content-type']?.split(';')[0].trim()!=='application/json')return send(415,{error:'JSON settings required'});
           configureIndex(root,store?[store.provider]:[...stores.keys()],await readJsonRequest(request));
+          summaryWorker.cancel();
         }else if(request.method!=='GET')return send(405,{error:'Unsupported method'});
         return send(200,dashboardIndex(store?[store]:activeStores()));
       }
@@ -95,5 +106,5 @@ export function createDashboard(source){
       send(200,readFileSync(new URL('../web/'+file[0],import.meta.url)),file[1]);
     }catch(e){send(e.status ?? (e.message==='Invalid thread list parameters'?400:500),{error:e.status?e.message:e.message==='Invalid thread list parameters'?'Invalid list parameters':'Unable to read local history',...(e.code?{code:e.code}:{})});}
   });
-  startIndexing(server,activeStores);return server;
+  startIndexing(server,activeStores);const summaryWorker=startSummaries(server,root,activeStores);return server;
 }

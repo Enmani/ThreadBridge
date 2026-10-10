@@ -9,6 +9,7 @@ export function setupIndexSettings(){
     get('index-updated').textContent=data.updated?new Date(data.updated).toLocaleString():l.none;
     get('index-rebuild').disabled=!data.enabled||busy;
     get('index-error').textContent=data.errors?l.indexRetry:'';get('index-error').hidden=!data.errors;
+    document.dispatchEvent(new CustomEvent('index-settings-updated',{detail:data}));
   }
   async function request(options){
     const response=await fetch('/api/index',{cache:'no-store',signal:AbortSignal.timeout(10000),...options});

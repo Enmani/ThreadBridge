@@ -11,7 +11,7 @@ Save and search your ChatGPT, Claude and Gemini history locally, and make it ava
 - Discover conversation IDs, sync content, or monitor new IDs through a Chrome/Edge extension. ChatGPT also discovers project and archive directories.
 - Archive ChatGPT messages already loaded while browsing, with explicit coverage labels for partial content.
 - Search local history, read revisions, and consume changes with acknowledged cursors.
-- Navigate a local binary index of archived versions and branches. Visiting AI clients fill summaries from the leaves upward; Settings shows indexing and summary progress separately. See [chat index](docs/chat-index.md).
+- Navigate a local binary index of archived versions and branches. Add API, local-model or existing MCP-client connections in Settings and choose a summary model. Background generation has a daily request limit; visiting AI clients can also fill summaries on demand. OMP is not required. See [chat index](docs/chat-index.md).
 - Inspect sync progress, pause/resume all added platforms, import ChatGPT JSON, and sort every column across the combined history. Help is available in hover/focus bubbles.
 - Connect through a local stdio MCP server. No OpenAI API key or external database is required.
 
@@ -49,6 +49,8 @@ An optional Codex native adapter can read known conversation IDs when the deskto
 ## Data and limits
 
 Data stays in your local database; the extension contacts the added platforms for browser sync. Claude and Gemini session credentials remain in the browser. ChatGPT token-based developer tools may save a local session file. Never publish `data/`, session files or real conversation exports.
+
+Optional API summary generation sends individual source chunks or child summaries to the selected service and uses its quota. Local models receive the same bounded inputs on loopback. API keys are protected in the backend, never returned to the browser; see [connection details](docs/chat-index.md) and [backup instructions](docs/operations.md). An existing MCP client chooses and runs its own model.
 
 Browser sync depends on undocumented website endpoints and may break when a website changes. Claude and Gemini snapshots are labeled `bounded-text`; their complete branch coverage is unconfirmed. Gemini reads request at most 10,000 turns and reject a response that reaches the window or signals more data. An archived tree does not prove the server returned everything. Deleted and temporary chats cannot be recovered, and attachment files are not downloaded. Full-account coverage and long-running sync have not been established by the automated tests.
 

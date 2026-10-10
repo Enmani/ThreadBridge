@@ -8,6 +8,7 @@ import {migrateThreads} from './store-migrations.mjs';
 import {initializeBrowserArchive,readBrowserArchive} from './browser-archive.mjs';
 import {initializeImportedArchive,readImportedArchive,searchImportedText,additionalImportedMessages} from './imported-archive.mjs';
 import {initializeChatIndex} from './chat-index-schema.mjs';
+import {initializeModels} from './model-schema.mjs';
 
 export class Store {
   transactionState={depth:0};
@@ -17,6 +18,7 @@ export class Store {
   constructor(file, account, provider='chatgpt') {
     if (!account || typeof account !== 'string') throw new Error('An explicit account namespace is required');
     if (file !== ':memory:') mkdirSync(path.dirname(path.resolve(file)),{recursive:true});
+    this.file=file===':memory:'?file:path.resolve(file);
     this.provider=providerId(provider);this.accountName=account;this.account=accountKey(provider,account);
     this.db = new DatabaseSync(file,{timeout:5000});
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
@@ -39,6 +41,7 @@ export class Store {
     initializeBrowserArchive(this.db);
     initializeImportedArchive(this.db);
     initializeChatIndex(this.db);
+    initializeModels(this.db);
   }
   close() { if(this.ownsDatabase)this.db.close(); }
   scope(provider){const view=Object.create(this);view.provider=providerId(provider);view.account=accountKey(provider,this.accountName);view.ownsDatabase=false;return view;}

@@ -1,9 +1,11 @@
 import {labels as l} from './labels.mjs';
 import {setupTheme} from './theme.mjs';
 import {setupIndexSettings} from './index-settings.mjs';
+import {setupModelSettings} from './model-settings.mjs';
 const $=id=>document.getElementById(id);let busy=false,loading=false,choices='';
 document.querySelectorAll('[data-label]').forEach(e=>e.textContent=l[e.dataset.label]);setupTheme($('theme'));
 setupIndexSettings();
+setupModelSettings();
 function fields(){for(const [id,provider] of [['claude-field','claude'],['gemini-field','gemini'],['chatgpt-field','chatgpt']])$(id).hidden=$('add-provider').value!==provider;}
 async function refresh(){
   if(loading||busy)return;loading=true;

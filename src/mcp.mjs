@@ -1,5 +1,6 @@
 import readline from 'node:readline';
 import {indexTool,invokeIndex} from './chat-index-interface.mjs';
+import {startModelClient} from './model-connections.mjs';
 import {integer,ids,runSync} from './service.mjs';
 
 const tools=[
@@ -37,13 +38,15 @@ async function invoke(store,name,args,options) {
 }
 export async function serve(store,options={}) {
   const input=readline.createInterface({input:process.stdin,crlfDelay:Infinity});
+  let disconnect;
   // Sequential dispatch prevents overlapping syncs and keeps consumer offer/ack ordering explicit.
-  for await(const line of input) {
+  try{for await(const line of input) {
     let request;
     try {
       if(Buffer.byteLength(line)>1024*1024)throw new Error('MCP input exceeds 1 MiB');request=JSON.parse(line);
       if(request.jsonrpc!=='2.0' || typeof request.method!=='string')throw new Error('Invalid JSON-RPC');
       if(request.id===undefined)continue;
+      if(request.method==='initialize'&&options['model-client']&&!disconnect)disconnect=startModelClient(store,options['model-client']);
       let result;
       switch(request.method) {
         case 'initialize':result={protocolVersion:['2024-11-05','2025-03-26','2025-06-18'].includes(request.params?.protocolVersion)?request.params.protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'threadbridge',version:'0.9.0'}};break;
@@ -56,5 +59,5 @@ export async function serve(store,options={}) {
       }
       process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request.id,result})+'\n');
     } catch(e){process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:request?.id ?? null,error:{code:-32600,message:request?e.message:'Invalid JSON request'}})+'\n');}
-  }
+  }}finally{disconnect?.();input.close();}
 }

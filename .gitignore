@@ -12,6 +12,7 @@ authsession.json
 auth-session.json
 *.sqlite*
 *.db
+*.model-key
 *.log
 *.pid
 .DS_Store

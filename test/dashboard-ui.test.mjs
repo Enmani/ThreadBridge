@@ -39,11 +39,12 @@ test('Settings preserves existing platforms and waits for verified connection in
   const w=page(t,'settings.html');let added=false,verified=false,poll;
   w.setInterval=callback=>{poll=callback;return 0;};
   w.fetch=async(path,options)=>{
+    if(path==='/api/models')return response({items:[],settings:{connection:null,model:null,running:false,dailyLimit:200,completed:0},usage:{requests:0,input_tokens:0,output_tokens:0},indexEnabled:true});
     if(path==='/api/index')return response({enabled:true,eligible:0,indexed:0,pending:0,errors:0,pendingSummaries:0,updated:null});
     assert.equal(path,'/api/connections');if(options?.method==='POST'){assert.deepEqual(JSON.parse(options.body),{provider:'claude'});added=true;return response({added:true,connected:false});}
     return response({items:[{name:'ChatGPT',status:'connected'},...(added?[{name:'Claude',status:verified?'connected':'connecting'}]:[])],available:added?[{id:'gemini',name:'Gemini'}]:[{id:'claude',name:'Claude'},{id:'gemini',name:'Gemini'}]});
   };
-  w.eval('const l=window.testLabels;'+source('theme.mjs')+'\n'+source('index-settings.mjs')+'\n'+source('settings.mjs'));
+  w.eval('const l=window.testLabels;'+source('theme.mjs')+'\n'+source('index-settings.mjs')+'\n'+source('model-settings.mjs')+'\n'+source('settings.mjs'));
   await until(()=>!w.document.getElementById('show-add').disabled);w.document.getElementById('show-add').click();
   w.document.getElementById('add-form').dispatchEvent(new w.Event('submit',{cancelable:true}));
   await until(()=>w.document.getElementById('connections').textContent.includes('Claude'));
