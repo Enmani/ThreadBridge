@@ -37,7 +37,9 @@ export async function summarizeNext(root,stores,{signal,generate=generateSummary
   const current=()=>{const s=modelSettings(root),r=modelConnection(root,work.row.id),l=root.db.prepare('SELECT * FROM model_index_leases WHERE account=?').get(account);
     return Boolean(s.running&&s.version===work.settings.version&&r?.version===work.row.version&&l?.owner===owner&&l.expires>Date.now());};
   try{
-    const result=await generate(work.row,revealCredential(root,work.row),work.settings.model,work.task,{signal});
+    const secret=await revealCredential(root,work.row);
+    if(signal?.aborted||isClosed()||!current())return;
+    const result=await generate(work.row,secret,work.settings.model,work.task,{signal});
     if(signal?.aborted)return;
     root.transaction(()=>{
       root.db.prepare('UPDATE model_index_usage SET input_tokens=input_tokens+?,output_tokens=output_tokens+? WHERE account=? AND day=?')

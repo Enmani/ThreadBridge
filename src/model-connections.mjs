@@ -37,10 +37,10 @@ export async function saveModelConnection(store,value){
   validate(value);const old=value.id?requireRow(store,value.id):null,id=old?.id??randomUUID();
   const row={id,name:value.name.trim(),kind:value.kind,protocol:value.kind==='client'?'mcp':value.protocol,base_url:modelEndpoint(value.kind,value.protocol,value.endpoint)};
   // Credentials never carry across a changed destination or provider.
-  const secret=value.apiKey||(old&&old.kind===row.kind&&old.protocol===row.protocol&&old.base_url===row.base_url?revealCredential(store,old):'');
+  const secret=value.apiKey||(old&&old.kind===row.kind&&old.protocol===row.protocol&&old.base_url===row.base_url?await revealCredential(store,old):'');
   if(row.kind==='api'&&!secret)throw modelError('model-key-required');
   const catalog=row.kind==='client'?['client-current']:await discoverModels(row,secret);
-  const credential=protectCredential(store,id,secret),at=new Date().toISOString();
+  const credential=await protectCredential(store,id,secret),at=new Date().toISOString();
   store.transaction(()=>{
     if(old&&modelConnection(store,id)?.version!==old.version)throw modelError('model-settings-changed',409);
     store.db.prepare(`INSERT INTO model_connections VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET
@@ -53,7 +53,7 @@ export async function saveModelConnection(store,value){
 export async function refreshModelConnection(store,id){
   const row=requireRow(store,id);if(row.kind==='client')return;
   let catalog,error=null;
-  try{catalog=await discoverModels(row,revealCredential(store,row));}catch(e){error=e.code??'model-network';}
+  try{catalog=await discoverModels(row,await revealCredential(store,row));}catch(e){error=e.code??'model-network';}
   store.transaction(()=>{
     if(modelConnection(store,id)?.version!==row.version)throw modelError('model-settings-changed',409);
     store.db.prepare('UPDATE model_connections SET status=?,catalog=?,checked_at=?,error=?,version=version+1 WHERE account=? AND id=?')

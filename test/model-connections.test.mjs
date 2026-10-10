@@ -7,7 +7,7 @@ import {Store} from '../src/store.mjs';
 import {snapshot} from '../src/model.mjs';
 import {fixture,tree} from './fixtures.mjs';
 import {saveModelConnection,modelConnection,modelView,modelSettings,configureSummary,removeModelConnection,refreshModelConnection} from '../src/model-connections.mjs';
-import {protectCredential,revealCredential} from '../src/model-credentials.mjs';
+import {revealCredential} from '../src/model-credentials.mjs';
 import {modelEndpoint,discoverModels,generateSummary} from '../src/model-transport.mjs';
 import {summarizeNext} from '../src/summary-worker.mjs';
 import {indexStatus,summaryTasks,updateIndex,indexZoom} from '../src/chat-index.mjs';
@@ -38,13 +38,15 @@ const result={summary:'有效摘要',inputTokens:10,outputTokens:5};
 
 test('connections verify catalogs, protect credentials, survive reopen and isolate account settings',async t=>{
   const f=await connected(t),row=modelConnection(f.store,f.id);assert.equal(row.status,'connected');assert.equal(row.credential.includes('synthetic-key'),false);
-  assert.equal(revealCredential(f.store,row),'synthetic-key');assert.equal(JSON.stringify(modelView(f.store)).includes('synthetic-key'),false);
+  assert.equal(await revealCredential(f.store,row),'synthetic-key');assert.equal(JSON.stringify(modelView(f.store)).includes('synthetic-key'),false);
   const reader=new Store(f.db,'test'),other=new Store(f.db,'another');
-  try{assert.equal(revealCredential(reader,modelConnection(reader,f.id)),'synthetic-key');assert.equal(modelSettings(reader).model,'test-small');
-    assert.equal(modelView(other).items.length,0);assert.throws(()=>revealCredential(other,row),/Reconnect/);assert.throws(()=>removeModelConnection(other,f.id));
+  let responsive=false;const heartbeat=setImmediate(()=>responsive=true);
+  try{assert.equal(await revealCredential(reader,modelConnection(reader,f.id)),'synthetic-key');assert.equal(modelSettings(reader).model,'test-small');
+    if(process.platform==='win32')assert.ok(responsive,'DPAPI must leave the event loop responsive');
+    assert.equal(modelView(other).items.length,0);await assert.rejects(revealCredential(other,row),/Reconnect/);assert.throws(()=>removeModelConnection(other,f.id));
     assert.throws(()=>createDashboard(new Map([['chatgpt',f.store],['claude',other.scope('claude')]])),/share the account/);
     await assert.rejects(summarizeNext(f.store,[other]),/share the account/);
-  }finally{reader.close();other.close();}
+  }finally{clearImmediate(heartbeat);reader.close();other.close();}
   assert.throws(()=>modelEndpoint('local','compatible','http://192.168.1.1/v1'));assert.throws(()=>modelEndpoint('api','compatible',f.api.base+'/v1'));
   assert.throws(()=>modelEndpoint('local','compatible','http://user:secret@127.0.0.1/v1'));assert.throws(()=>modelEndpoint('api','compatible','https://example.com/v1?key=secret'));
   assert.equal(modelEndpoint('api','openai','ignored'), 'https://api.openai.com/v1');
@@ -88,10 +90,10 @@ test('leases prevent parallel charges and changed settings or source generations
   let finish;const generate=()=>new Promise(resolve=>finish=()=>resolve(result));
   const work=summarizeNext(f.store,[f.store],{generate});await summarizeNext(f.store,[f.store],{generate:()=>assert.fail('second worker must not call model')});
   configureSummary(f.store,{action:'select',connection:f.id,model:'test-large'});finish();await work;assert.equal(modelSettings(f.store).completed,0);
-  configureSummary(f.store,{action:'run',running:true});const stale=summarizeNext(f.store,[f.store],{generate});
+  configureSummary(f.store,{action:'run',running:true});const stale=summarizeNext(f.store,[f.store],{generate});await new Promise(setImmediate);
   const changed=tree('chat','second text',2);changed.title='changed title';f.store.save(snapshot(changed,'chat'));updateIndex(f.store);finish();await stale;
   assert.equal(modelSettings(f.store).completed,0);assert.equal(modelSettings(f.store).running,1);
-  const abort=new AbortController(),cancelled=summarizeNext(f.store,[f.store],{generate,signal:abort.signal});abort.abort();finish();await cancelled;
+  const abort=new AbortController(),cancelled=summarizeNext(f.store,[f.store],{generate,signal:abort.signal});await new Promise(setImmediate);abort.abort();finish();await cancelled;
   assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM model_index_leases').get().n,0);
   removeModelConnection(f.store,f.id);assert.equal(modelSettings(f.store).connection,null);assert.equal(modelSettings(f.store).running,0);
 });
