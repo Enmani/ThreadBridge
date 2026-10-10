@@ -145,7 +145,7 @@ node src/cli.mjs ack --account personal --db "C:\路径\history.sqlite" --consum
 
 参考 [codex-mcp.example.toml](../codex-mcp.example.toml)，修改绝对路径与本地账号名称后加入 Codex MCP 配置。本版只提供本地 stdio 接口，不开放网络服务。
 
-推荐配置使用 `serve --local-only`，提供 6 个本地工具：`list_threads`、`search_history`、`fetch_threads`、`get_changes`、`ack_changes`、`get_sync_status`。`list_threads` 分页返回目录 ID、更新时间和存档状态，不联网读取正文。不启用本地模式时，另提供 `sync_history` 供备用通道使用。
+推荐配置使用 `serve --local-only`，提供 7 个本地工具：`list_threads`、`search_history`、`fetch_threads`、`get_changes`、`ack_changes`、`get_sync_status`、`chat_index`。本地模式不请求平台历史；`chat_index` 可整理派生索引和写入 AI 摘要。`list_threads` 分页返回目录 ID、更新时间和存档状态。不启用本地模式时，另提供 `sync_history` 供备用通道使用。聊天索引的设置与逐层摘要流程见 [聊天索引](chat-index.md)。
 
 ## 原生 Codex 通道
 

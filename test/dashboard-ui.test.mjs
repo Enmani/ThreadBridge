@@ -39,14 +39,33 @@ test('Settings preserves existing platforms and waits for verified connection in
   const w=page(t,'settings.html');let added=false,verified=false,poll;
   w.setInterval=callback=>{poll=callback;return 0;};
   w.fetch=async(path,options)=>{
+    if(path==='/api/index')return response({enabled:true,eligible:0,indexed:0,pending:0,errors:0,pendingSummaries:0,updated:null});
     assert.equal(path,'/api/connections');if(options?.method==='POST'){assert.deepEqual(JSON.parse(options.body),{provider:'claude'});added=true;return response({added:true,connected:false});}
     return response({items:[{name:'ChatGPT',status:'connected'},...(added?[{name:'Claude',status:verified?'connected':'connecting'}]:[])],available:added?[{id:'gemini',name:'Gemini'}]:[{id:'claude',name:'Claude'},{id:'gemini',name:'Gemini'}]});
   };
-  w.eval('const l=window.testLabels;'+source('theme.mjs')+'\n'+source('settings.mjs'));
+  w.eval('const l=window.testLabels;'+source('theme.mjs')+'\n'+source('index-settings.mjs')+'\n'+source('settings.mjs'));
   await until(()=>!w.document.getElementById('show-add').disabled);w.document.getElementById('show-add').click();
   w.document.getElementById('add-form').dispatchEvent(new w.Event('submit',{cancelable:true}));
   await until(()=>w.document.getElementById('connections').textContent.includes('Claude'));
   const rows=w.document.querySelectorAll('#connections li');assert.equal(rows[0].textContent,'ChatGPT已连接');assert.equal(rows[1].textContent,'Claude连接中…');
   verified=true;poll();await until(()=>w.document.querySelectorAll('#connections li')[1].textContent==='Claude已连接');
   assert.equal(w.document.getElementById('add-form').hidden,true);assert.equal(w.document.getElementById('add-provider').value,'gemini');
+});
+
+test('index Settings keeps a successful pause when an older poll finishes and shows rebuild failures',async t=>{
+  const w=page(t,'settings.html');let poll,finishOld,gets=0,enabled=true,fail=false;
+  const state=()=>({enabled,eligible:2,indexed:2,pending:0,errors:0,pendingSummaries:9,updated:null});
+  w.setInterval=callback=>{poll=callback;return 0;};
+  w.fetch=async(path,options)=>{
+    assert.equal(path,'/api/index');
+    if(options?.method==='POST'){const value=JSON.parse(options.body);if(fail)return {ok:false};if(value.enabled!==undefined)enabled=value.enabled;return response(state());}
+    gets++;if(gets===2)return new Promise(r=>finishOld=()=>r(response({...state(),enabled:true})));return response(state());
+  };
+  w.eval('const l=window.testLabels;'+source('index-settings.mjs')+'\nsetupIndexSettings();');
+  const toggle=w.document.getElementById('index-enabled');await until(()=>!toggle.disabled);assert.equal(toggle.checked,true);
+  poll();toggle.click();await until(()=>!toggle.disabled);assert.equal(toggle.checked,false);finishOld();
+  await until(()=>w.document.getElementById('index-state').textContent===labels.indexPaused);assert.equal(toggle.checked,false);
+  toggle.click();await until(()=>!toggle.disabled);assert.equal(toggle.checked,true);
+  fail=true;w.document.getElementById('index-rebuild').click();await until(()=>!w.document.getElementById('index-error').hidden);
+  assert.equal(w.document.getElementById('index-error').textContent,labels.indexSettingsError);assert.equal(toggle.checked,true);assert.equal(w.document.getElementById('index-rebuild').disabled,false);
 });

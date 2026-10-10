@@ -40,7 +40,7 @@ node src/cli.mjs search --account personal --db data/history.sqlite --query "项
 
 ## Codex 本地读取
 
-使用 `codex-mcp.example.toml` 中的配置，将路径改为本项目实际路径后加入 Codex 的 MCP 配置。`serve --local-only` 提供 6 个本地工具：列出线程目录、搜索、读取聊天、读取变化、确认变化和查看状态。
+使用 `codex-mcp.example.toml` 中的配置，将路径改为本项目实际路径后加入 Codex 的 MCP 配置。`serve --local-only` 提供 7 个本地工具：列出线程目录、搜索、读取聊天、读取变化、确认变化、查看状态和聊天索引。索引工具可在本机整理二叉树和写入摘要，见[聊天索引](docs/chat-index.md)。
 
 如需历史基线，可先将官方导出的 `conversations.json` 导入同一数据库：
 

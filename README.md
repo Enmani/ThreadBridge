@@ -11,6 +11,7 @@ Save and search your ChatGPT, Claude and Gemini history locally, and make it ava
 - Discover conversation IDs, sync content, or monitor new IDs through a Chrome/Edge extension. ChatGPT also discovers project and archive directories.
 - Archive ChatGPT messages already loaded while browsing, with explicit coverage labels for partial content.
 - Search local history, read revisions, and consume changes with acknowledged cursors.
+- Navigate a local binary index of archived versions and branches. Visiting AI clients fill summaries from the leaves upward; Settings shows indexing and summary progress separately. See [chat index](docs/chat-index.md).
 - Inspect sync progress, pause/resume all added platforms, import ChatGPT JSON, and sort every column across the combined history. Help is available in hover/focus bubbles.
 - Connect through a local stdio MCP server. No OpenAI API key or external database is required.
 
@@ -41,7 +42,7 @@ The installer starts with ChatGPT. Open Settings → Add platform to add Claude 
 
 ## MCP
 
-[codex-mcp.example.toml](codex-mcp.example.toml) shows separate local-only servers for each provider. Replace its absolute paths before use. Each exposes `list_threads`, `search_history`, `fetch_threads`, `get_changes`, `ack_changes` and `get_sync_status`. CLI commands accept `--provider chatgpt|claude|gemini` (default: ChatGPT).
+[codex-mcp.example.toml](codex-mcp.example.toml) shows separate local-only servers for each provider. Replace its absolute paths before use. Each exposes `list_threads`, `search_history`, `fetch_threads`, `get_changes`, `ack_changes`, `get_sync_status` and `chat_index`. CLI commands accept `--provider chatgpt|claude|gemini` (default: ChatGPT).
 
 An optional Codex native adapter can read known conversation IDs when the desktop app exposes its internal pipe. That interface is experimental and returns bounded text. See [usage](docs/usage.md).
 

@@ -5,6 +5,7 @@
 - [ ] Verify compact dashboard and Settings in a real browser, including hover/focus bubbles, column sorting, light/dark, narrow screens and 200% zoom. Current development browser blocked the isolated preview with `ERR_BLOCKED_BY_CLIENT`.
 - [ ] Establish Gemini long-conversation pagination before supporting responses at the 10,000-turn window. Current adapter rejects truncated windows and retains pending work.
 - [ ] Measure long-running incremental sync and full-account coverage against an independently known directory. Automated fixtures cannot establish remote completeness.
+- [ ] Measure binary indexing time, disk growth and query/summary usefulness on a real large local archive. Verify a real AI client's bottom-up summary workflow; synthetic tests establish mechanics only.
 - [ ] Add Native Messaging registration instructions and installers for macOS and Linux before claiming browser-sync installation support on those systems.
 
 Run `npm run precheck` for local changes. Do not place private transcripts or databases in verification records.

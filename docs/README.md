@@ -9,6 +9,7 @@
 - [Passive browser archive](../ADR-BROWSER-ARCHIVE.md)
 - [JSON import](../ADR-JSON-IMPORT.md)
 - [Provider isolation, connections and sorting](../ADR-PROVIDERS.md)
+- [Chat index and AI summary workflow](chat-index.md) · [Index architecture](../ADR-CHAT-INDEX.md)
 - [Dashboard behavior](../DESIGN.md)
 - [Third-party notices](../THIRD-PARTY-NOTICES.md)
 - [Contributing](../CONTRIBUTING.md) and [open tasks](../TODO.md)

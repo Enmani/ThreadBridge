@@ -13,4 +13,12 @@
     </div><div class="sync-actions"><button id="add-submit" type="submit" data-label="addConnect"></button><button id="cancel-add" type="button" data-label="cancel"></button></div></form>
   </section>
   <p class="muted" data-label="connectionNote"></p>
+  <section aria-labelledby="index-heading" class="overview">
+    <div class="table-heading"><div class="brand-line"><h2 id="index-heading" data-label="chatIndex"></h2><p class="muted" data-label="indexPurpose"></p></div><label class="watch-option"><input id="index-enabled" type="checkbox" role="switch" disabled><span data-label="indexEnabled"></span></label></div>
+    <div class="summary-line"><p id="index-state" role="status" data-label="loading"></p><p class="muted" data-label="indexSummaryMode"></p></div>
+    <dl class="counts"><div><dt data-label="indexedChats"></dt><dd id="index-count">—</dd></div><div><dt data-label="pendingSummaries"></dt><dd id="index-summaries">—</dd></div><div><dt data-label="indexUpdated"></dt><dd id="index-updated">—</dd></div></dl>
+    <p id="index-error" class="error" role="alert" hidden></p>
+    <details class="index-maintenance"><summary data-label="indexMaintenance"></summary><p class="muted" data-label="indexPauseNote"></p><p class="muted" data-label="indexRebuildNote"></p><button id="index-rebuild" type="button" data-label="indexRebuild" disabled></button></details>
+    <details><summary data-label="indexConnect"></summary><p class="muted" data-label="indexConnectNote"></p><a class="button" href="/chat-index-guide" target="_blank" rel="noopener" data-label="indexGuide"></a></details>
+  </section>
 </main></body></html>

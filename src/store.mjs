@@ -7,6 +7,7 @@ import {threadOrder} from './thread-order.mjs';
 import {migrateThreads} from './store-migrations.mjs';
 import {initializeBrowserArchive,readBrowserArchive} from './browser-archive.mjs';
 import {initializeImportedArchive,readImportedArchive,searchImportedText,additionalImportedMessages} from './imported-archive.mjs';
+import {initializeChatIndex} from './chat-index-schema.mjs';
 
 export class Store {
   transactionState={depth:0};
@@ -37,6 +38,7 @@ export class Store {
     migrateThreads(this.db);
     initializeBrowserArchive(this.db);
     initializeImportedArchive(this.db);
+    initializeChatIndex(this.db);
   }
   close() { if(this.ownsDatabase)this.db.close(); }
   scope(provider){const view=Object.create(this);view.provider=providerId(provider);view.account=accountKey(provider,this.accountName);view.ownsDatabase=false;return view;}

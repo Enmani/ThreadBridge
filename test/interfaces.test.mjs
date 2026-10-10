@@ -33,7 +33,7 @@ test('MCP stdio negotiates, discovers tools, searches and rejects malformed call
   const replies=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['src/cli.mjs','serve','--db',f.db,'--account','test']);let output='',errors='';
     child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>errors+=x);child.on('error',reject);child.on('close',code=>code?reject(new Error(errors)):resolve(output.trim().split('\n').map(JSON.parse)));
     child.stdin.end(requests.map(x=>JSON.stringify(x)).join('\n')+'\n');});
-  assert.equal(replies.length,6);assert.equal(replies[0].result.protocolVersion,'2025-06-18');assert.equal(replies[1].result.tools.length,7);
+  assert.equal(replies.length,6);assert.equal(replies[0].result.protocolVersion,'2025-06-18');assert.equal(replies[1].result.tools.length,8);assert.ok(replies[1].result.tools.some(t=>t.name==='chat_index'));
   assert.equal(JSON.parse(replies[2].result.content[0].text)[0].thread,'mcp-chat');assert.equal(replies[3].result.isError,true);
   assert.ok(JSON.parse(replies[4].result.content[0].text)[0].raw.mapping.descendant);assert.equal(replies[5].result.isError,true);
 });
