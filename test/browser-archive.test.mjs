@@ -105,6 +105,40 @@ const embeddedSession=(user='user-test',account='personal-id',structure='persona
   '<script type="application/json">'+JSON.stringify({authStatus:'logged_in',session:{
     user:{id:user,email:'must-not-be-posted@example.test'},account:{id:account,structure},accessToken:'never-persist-this'}})+'</script>';
 
+test('an accounts default alias cannot overwrite a known personal account ID',async t=>{
+  const f=observedPage(t,embeddedSession(),{'/backend-api/accounts/check/v4-2023-04-27':{
+    accounts:{default:{account:{structure:'personal'}}}}});
+  await f.w.fetch('/backend-api/accounts/check/v4-2023-04-27');await wait(20);
+  await f.w.fetch('/backend-api/conversation/open-chat',{headers:{'chatgpt-account-id':'personal-id'}});await wait(60);
+  assert.equal(f.captures.length,1);assert.equal(f.captures[0].workspace,null);
+  const storeFixture=await fixture(t);bind(storeFixture.store);
+  assert.equal(acceptBrowserCapture(storeFixture.store,f.captures[0],settings).ok,true);
+});
+
+test('late personal account metadata retries unchanged page messages under the corrected workspace',async t=>{
+  const f=observedPage(t,'<div data-message-author-role="assistant" data-message-id="one">Existing reply</div>');
+  await f.w.fetch('/api/auth/session');await wait(20);
+  await f.w.fetch('/backend-api/profile',{headers:{'chatgpt-account-id':'personal-id'}});await wait(1400);
+  assert.equal(f.captures.length,1);assert.equal(f.captures[0].workspace,'personal-id');
+  await f.w.fetch('/backend-api/accounts/check/v4-2023-04-27');await wait(1400);
+  assert.equal(f.captures.length,2);assert.equal(f.captures[1].workspace,null);
+  assert.equal(f.captures[1].messages[0].id,'one');
+  assert.equal(f.calls.length,3);
+});
+
+test('distinct positively identified personal IDs stay personal without accepting a team ID',async t=>{
+  const f=observedPage(t,embeddedSession(),{'/backend-api/accounts/check/v4-2023-04-27':{
+    accounts:{default:{account:{account_id:'other-personal-id',structure:'personal'}}}}});
+  await f.w.fetch('/backend-api/accounts/check/v4-2023-04-27');await wait(20);
+  for(const id of ['personal-id','other-personal-id','team-id']){
+    await f.w.fetch('/backend-api/conversation/open-chat',{headers:{'chatgpt-account-id':id}});await wait(60);
+  }
+  assert.deepEqual(f.captures.map(c=>c.workspace),[null,null,'team-id']);
+  const storeFixture=await fixture(t);bind(storeFixture.store);
+  assert.equal(acceptBrowserCapture(storeFixture.store,f.captures[2],settings).state,'workspace-mismatch');
+  assert.equal(storeFixture.store.status().threads,0);
+});
+
 test('already loaded server session enables passive DOM capture without another website request',async t=>{
   const f=observedPage(t,embeddedSession()+'<div data-chatgpt-search-message-ids="original-reply"><div data-conversation-role="assistant"></div><p>Existing reply</p></div>');
   await wait(1400);
