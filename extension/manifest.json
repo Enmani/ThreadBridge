@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "ThreadBridge Local Sync",
+  "version": "0.8.0",
+  "description": "Sync your ChatGPT history to local SQLite through Native Messaging.",
+  "minimum_chrome_version": "120",
+  "permissions": [
+    "nativeMessaging",
+    "scripting",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "archive-relay.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "archive-observer.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "action": {
+    "default_title": "ThreadBridge：查看本机同步状态；点击检查同步"
+  }
+}

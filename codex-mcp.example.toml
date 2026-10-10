@@ -1,0 +1,4 @@
+# Replace both absolute paths and the account name with your own values.
+[mcp_servers.threadbridge]
+command = "node"
+args = ["C:/path/to/ThreadBridge/src/cli.mjs", "serve", "--local-only", "--account", "personal", "--db", "C:/path/to/ThreadBridge/data/history.sqlite"]

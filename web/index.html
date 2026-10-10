@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ThreadBridge</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.mjs"></script></head>
+<body><main>
+  <header><div><p class="eyebrow">ThreadBridge</p><h1 data-label="heading"></h1></div><button id="theme" type="button" data-label="theme"></button></header>
+  <section class="overview" aria-labelledby="state-heading"><div class="table-heading"><h2 id="state-heading" data-label="status"></h2><button id="pause" type="button" data-label="pause" disabled></button></div>
+    <div class="sync-actions" role="group" aria-label="同步模式"><button id="sync-ids" type="button" data-label="syncIds" disabled></button><button id="sync-full" type="button" data-label="syncFull" disabled></button></div>
+    <label class="watch-option"><input id="watch-new" type="checkbox" role="switch" disabled><span data-label="watchNew"></span></label><p id="mode" class="muted"></p>
+    <p id="state" class="state" role="status"></p><p id="connection-note" class="muted"></p>
+    <label class="watch-option"><input id="browser-archive" type="checkbox" role="switch" disabled><span data-label="browserArchive"></span></label>
+    <p data-label="browserArchiveNote" class="muted"></p><p id="browser-archive-status" class="muted" role="status"></p>
+    <dl class="times"><div><dt data-label="lastRequest"></dt><dd id="last-request"></dd></div><div><dt data-label="lastSaved"></dt><dd id="last-saved"></dd></div><div><dt data-label="nextRequest"></dt><dd id="next-request"></dd><dd id="countdown" class="muted"></dd></div></dl>
+    <p id="scan" class="muted"></p><p id="error" class="error" role="alert" hidden></p><p id="control-error" class="error" role="alert" hidden></p>
+    <dl class="counts"><div><dt data-label="discovered"></dt><dd id="discovered">—</dd></div><div><dt data-label="fullTrees"></dt><dd id="full-trees">—</dd></div><div><dt data-label="textArchives"></dt><dd id="text-archives">—</dd></div><div><dt data-label="browserArchives"></dt><dd id="browser-archives">—</dd></div><div><dt data-label="importedArchives"></dt><dd id="imported-archives">—</dd></div><div><dt data-label="pending"></dt><dd id="pending">—</dd></div></dl>
+  </section>
+  <section aria-labelledby="threads-heading"><div class="table-heading"><h2 id="threads-heading" data-label="threads"></h2><div class="sync-actions"><button id="import-json" type="button" data-label="importJson"></button><button id="refresh" type="button" data-label="refresh"></button></div></div>
+    <input id="import-files" type="file" accept=".json,application/json" multiple hidden>
+    <p data-label="importNote" class="muted"></p><p id="import-status" role="status" aria-live="polite"></p><ul id="import-errors" class="error" role="alert" hidden></ul>
+    <form id="search-form"><label for="search" data-label="search"></label><div class="search"><input id="search" type="search" maxlength="200"><button type="submit" data-label="searchButton"></button></div></form>
+    <p id="result-count" class="muted" aria-live="polite"></p><p id="empty" class="muted" hidden></p>
+    <table><caption class="visually-hidden" data-label="threads"></caption><thead><tr><th scope="col" data-label="thread"></th><th scope="col" data-label="scope"></th><th scope="col" data-label="project"></th><th scope="col" data-label="archiveState"></th><th scope="col" data-label="messages"></th><th scope="col" data-label="updated"></th><th scope="col" data-label="saved"></th></tr></thead><tbody id="rows"></tbody></table>
+    <nav class="pagination" aria-label="分页"><button id="previous" type="button" data-label="previous"></button><span id="page"></span><button id="next" type="button" data-label="next"></button></nav>
+  </section>
+  <footer><p data-label="localOnly"></p><details id="setup"><summary data-label="setup"></summary><ol><li data-label="setupOne"></li><li data-label="setupTwo"></li><li data-label="setupThree"></li></ol></details></footer>
+</main></body></html>
