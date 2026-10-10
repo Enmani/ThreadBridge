@@ -65,7 +65,8 @@ export async function generateSummary(row,secret,model,task,{signal}={}){
   else if(row.protocol==='gemini'){const c=data.candidates?.[0];truncated=c?.finishReason!=='STOP';text=c?.content?.parts?.filter(p=>!p.thought).map(p=>p.text??'').join('');}
   else{const c=data.choices?.[0];truncated=c?.finish_reason!=='stop';text=c?.message?.content;}
   const usage=data.usage??data.usageMetadata??{},number=x=>Number.isSafeInteger(x)&&x>=0?x:0;
-  const tokens={inputTokens:number(usage.input_tokens??usage.prompt_tokens??usage.promptTokenCount),outputTokens:number(usage.output_tokens??usage.completion_tokens??usage.candidatesTokenCount)};
+  const tokens={inputTokens:number(usage.input_tokens??usage.prompt_tokens??usage.promptTokenCount),
+    outputTokens:number(usage.output_tokens??usage.completion_tokens??(number(usage.candidatesTokenCount)+number(usage.thoughtsTokenCount)))};
   if(truncated||typeof text!=='string'||!text.trim()||/[\r\n]/.test(text.trim())||Buffer.byteLength(text.trim())>280)throw Object.assign(modelError('model-summary-format',502),{usage:tokens});
   return {summary:text.trim(),...tokens};
 }
