@@ -25,7 +25,7 @@ async function providerFixture(t){
 }
 function open(t,db,provider){const s=new Store(db,'test',provider);connections.get(t).push(s);return s;}
 const extensionId='a'.repeat(32);
-const settings=(db,provider)=>workerConfig({db,provider,account:'test',extensionId,paceMs:0,maxDirectoryPages:100,maxPerRun:10});
+const settings=(db,provider)=>workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:10,initialDirectoryPages:100,db,provider,account:'test',extensionId,paceMs:0,maxDirectoryPages:100,maxPerRun:10});
 function rpcFor(provider,{failure=null}={}){
   return {closed:false,paths:[],notices:[],send(v){this.notices.push(v);},async request(p,workspace,actual){
     assert.equal(actual,provider);this.paths.push(p);

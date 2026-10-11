@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {BrowserTransport} from '../src/browser-transport.mjs';
 import {BrowserWorker,workerConfig} from '../src/browser-worker.mjs';
 import {fixture} from './fixtures.mjs';
+import {successfulRequest} from '../src/sync-policy.mjs';
 
 test('a successful history request immediately restores the base interval and its persisted deadline',async()=>{
   const starts=[],deadlines=[];let successes=0;
@@ -33,21 +34,23 @@ test('login success, failed history requests and account changes do not reset th
   }
 });
 
-test('worker resets durable backoff within a batch; a later 429 starts from the base interval again',async t=>{
-  const f=await fixture(t),config=workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:10,maxDirectoryPages:1,maxPerRun:1});
+test('worker preserves slowdown after a success and recovers only after a successful window',async t=>{
+  const f=await fixture(t),config=workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:10,
+    initialPaceMs:10,initialMinPaceMs:10,initialDirectoryPages:1,initialMaxPerRun:1});
   f.store.meta('effective_pace_ms',40);f.store.meta('rate_limit_strikes',2);let histories=0;
   const rpc={closed:false,send(){},async request(p){
-    if(p==='/api/auth/session'){assert.equal(f.store.meta('effective_pace_ms'),'40');assert.equal(f.store.meta('rate_limit_strikes'),'2');return {status:200,identity:'user'};}
-    histories++;assert.equal(f.store.meta('effective_pace_ms'),histories===1?'40':'10');
-    if(histories>1)assert.equal(f.store.meta('rate_limit_strikes'),'0');
+    if(p==='/api/auth/session')return {status:200,identity:'user'};
+    histories++;assert.equal(f.store.meta('effective_pace_ms'),'40');assert.equal(f.store.meta('rate_limit_strikes'),'2');
     return {status:200,identity:'user',data:await f.api.request(p)};
   }};
   const worker=new BrowserWorker(rpc,f.store,config);
   try{
-    await worker.run();assert.ok(histories>=2);assert.equal(f.store.meta('effective_pace_ms'),'10');assert.equal(f.store.meta('rate_limit_strikes'),'0');
-    worker.rateLimited({retryAt:Date.now()+3600000});assert.equal(f.store.meta('effective_pace_ms'),'20');assert.equal(f.store.meta('rate_limit_strikes'),'1');
+    await worker.run();assert.equal(histories,2);assert.equal(f.store.meta('effective_pace_ms'),'40');
+    f.store.meta('pace_successes',19);assert.equal(successfulRequest(f.store,config),32);
+    assert.equal(f.store.meta('rate_limit_strikes'),'1');assert.equal(f.store.meta('pace_successes'),'0');
+    worker.rateLimited({retryAt:Date.now()+3600000});assert.equal(f.store.meta('effective_pace_ms'),'64');assert.equal(f.store.meta('rate_limit_strikes'),'2');
     assert.ok(Number(f.store.meta('next_run_at'))>=Date.now()+3599000);
     const before=histories;await worker.run();assert.equal(histories,before);
-    worker.rateLimited({});assert.equal(f.store.meta('effective_pace_ms'),'40');assert.equal(f.store.meta('rate_limit_strikes'),'2');
-  }finally{worker.close();}
+    worker.rateLimited({});assert.equal(f.store.meta('effective_pace_ms'),'128');assert.equal(f.store.meta('rate_limit_strikes'),'3');
+  }finally{await worker.close();}
 });

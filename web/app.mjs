@@ -33,7 +33,7 @@ function showStatus(data){
   state.status=data;const worker=data.background;
   $('browser-controls').hidden=data.capabilities?.browserArchive===false;$('import-json').hidden=data.capabilities?.jsonImport===false;
   set('state',data.runtime.complete?l.idsComplete:data.runtime.paused?l.states.paused:data.runtime.connected?(l.states[worker.state] ?? worker.state):l.disconnected);
-  set('mode',data.runtime.watchNew?l.watchingMode:l.modes[data.runtime.mode]);
+  set('mode',data.runtime.watchNew?l.watchingMode:data.runtime.mode==='full'&&data.runtime.phase?data.runtime.phase==='initial'?l.initialSync:l.maintenanceSync:l.modes[data.runtime.mode]);
   set('pace',data.runtime.connected?l.pace(Math.round(worker.paceMs/1000)):'');
   set('connection-note',data.runtime.complete?l.idsCompleteNote:data.runtime.paused?l.pauseNote:data.runtime.connected?
     (data.runtime.watchNew?l.watchingNote(Math.round(data.runtime.directoryIntervalMs/60000))+' ':data.runtime.mode==='ids'?l.idsNote+' ':'')+l.pace(Math.round(worker.paceMs/1000)):l.connectNote);showControl();
@@ -44,7 +44,11 @@ function showStatus(data){
     l.browserErrors[data.browserCaptureState] ?? (browserSaved?l.browserSaved(browserSaved.title||l.untitled,date(browserSaved.at)):l.browserWaiting);
   set('browser-archive-detail',browserNote);set('browser-archive-status',l.browserErrors[data.browserCaptureState]??'');$('browser-archive-status').hidden=!data.runtime.browserArchive||!l.browserErrors[data.browserCaptureState];
   for(const [id,key] of [['discovered','threads'],['full-trees','fullTrees'],['text-archives','textArchives'],['browser-archives','browserArchives'],['imported-archives','importedArchives'],['pending','pending']])set(id,data[key]);
-  const scan=data.activeScan;set('scan',scan?l.scan(scan.scopes.reduce((n,s)=>n+s.pages,0),scan.pendingScopes):'');nextRequest();
+  const scan=data.activeScan,issues=data.runtime.scopeIssues??[];
+  const warning=l.syncIssues(issues.filter(s=>!s.done).length,data.runtime.failedThreads??0,issues.filter(s=>s.stopReason==='unavailable').length);
+  set('scan',[scan?l.scan(scan.scopes.reduce((n,s)=>n+s.pages,0),scan.pendingScopes):'',warning].filter(Boolean).join(' · '));
+  if(data.runtime.phase==='initial'&&data.runtime.mode==='full')$('connection-note').textContent+=' '+l.initialSyncNote;
+  if(warning)$('connection-note').textContent+=' '+warning+'：'+[...new Set(issues.map(s=>s.projectName??l.scopes[s.scope]??(s.scope==='projects'?'项目列表':s.scope.startsWith('project:')?'项目聊天':'补充项目目录')))].join('、');nextRequest();
 }
 function cell(row,label,value){const td=document.createElement('td');td.dataset.label=label;td.textContent=value;row.append(td);return td;}
 function showThreads(data){

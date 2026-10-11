@@ -3,6 +3,8 @@ import {sync} from './sync.mjs';
 import {SyncPaused,pauseRequested,syncMode,syncCommand,syncComplete,watchNewRequested,setSyncPaused,rateLimitUntil} from './sync-control.mjs';
 import {browserArchiveEnabled} from './browser-archive.mjs';
 import {providerId} from './providers.mjs';
+import {randomUUID} from 'node:crypto';
+import {initializePhase,initialSyncPending,basePace,successfulRequest,finishInitialSync,nextPayloadRetry,readyPayloads} from './sync-policy.mjs';
 
 export function workerConfig(value){
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('Invalid browser host configuration');
@@ -11,7 +13,10 @@ export function workerConfig(value){
   if(typeof value.db!=='string'||!value.db)throw new Error('Database path required');
   if(typeof value.extensionId!=='string'||!/^[a-p]{32}$/.test(value.extensionId))throw new Error('Invalid extension ID');
   if(value.workspace!=null&&(typeof value.workspace!=='string'||!/^[A-Za-z0-9_-]{1,160}$/.test(value.workspace)))throw new Error('Invalid workspace');
+  const initialPaceMs=number('initialPaceMs',3000,0,3600000),initialMinPaceMs=number('initialMinPaceMs',Math.min(2000,initialPaceMs),0,3600000);
+  if(initialMinPaceMs>initialPaceMs)throw new Error('Initial minimum pace exceeds starting pace');
   return {account:value.account,db:value.db,extensionId:value.extensionId,workspace:value.workspace ?? null,provider:providerId(value.provider),authuser:number('authuser',0,0,99),
+    initialPaceMs,initialMinPaceMs,initialMaxPerRun:number('initialMaxPerRun',100,1,1000),initialDirectoryPages:number('initialDirectoryPages',10,1,100000),
     paceMs:number('paceMs',90000,0,3600000),directoryIntervalMs:number('directoryIntervalMs',900000,1000,86400000),
     projectIntervalMs:number('projectIntervalMs',3600000,0,86400000),maxDirectoryPages:number('maxDirectoryPages',3,1,100000),
     auditIntervalMs:number('auditIntervalMs',86400000,1000,2592000000),auditAgeMs:number('auditAgeMs',604800000,1000,31536000000),
@@ -20,10 +25,14 @@ export function workerConfig(value){
 }
 export class BrowserWorker {
   constructor(rpc,store,config,{now=Date.now}={}){
+    const legacy=store.meta('sync_phase')===null;initializePhase(store);
+    if(legacy&&initialSyncPending(store)&&!rateLimitUntil(store)&&!Number(store.meta('rate_limit_strikes')??0)){
+      store.meta('effective_pace_ms',config.initialPaceMs);store.meta('next_request_at',0);store.meta('next_run_at',0);
+    }
     const requested=pauseRequested(store);Object.assign(this,{rpc,store,config,now,busy:false,timer:null,closed:false,paused:requested,pauseDesired:requested,
       mode:syncMode(store),command:syncCommand(store),archiveEnabled:browserArchiveEnabled(store)});
     store.meta('directory_interval_ms',config.directoryIntervalMs);
-    this.pulse=setInterval(()=>store.meta('worker_heartbeat_at',this.now()),10000);this.pulse.unref();
+    this.pulse=setInterval(()=>{store.meta('worker_heartbeat_at',this.now());if(this.leaseOwner)try{store.acquire(this.leaseOwner);}catch{this.currentApi?.pause();}},10000);this.pulse.unref();
     this.control=setInterval(()=>this.checkControl(),1000);this.control.unref();
   }
   checkControl(resume=true){
@@ -44,9 +53,11 @@ export class BrowserWorker {
   schedule(at){if(this.closed)return;clearTimeout(this.timer);this.store.meta('next_run_at',at);if(!this.paused)this.timer=setTimeout(()=>void this.run(),Math.min(2147483647,Math.max(0,at-this.now())));}
   rateLimited(error){
     const strikes=Number(this.store.meta('rate_limit_strikes') ?? 0)+1;this.store.meta('rate_limit_strikes',strikes);
-    const delay=Math.max(this.config.cooldownMs*Math.min(16,2**(strikes-1)),(error?.retryAt ?? 0)-this.now());
-    this.store.meta('effective_pace_ms',Math.min(3600000,Math.max(this.config.paceMs,Number(this.store.meta('effective_pace_ms') ?? this.config.paceMs))*2));
-    const until=this.now()+delay;this.store.meta('rate_limit_until',until);
+    const delay=Math.max(this.config.cooldownMs*Math.min(16,2**Math.min(4,strikes-1)),(error?.retryAt ?? 0)-this.now());
+    this.store.meta('pace_successes',0);
+    const base=basePace(this.store,this.config);
+    this.store.meta('effective_pace_ms',Math.min(3600000,Math.max(base===0?1000:1,base,Number(this.store.meta('effective_pace_ms') ?? 0))*2));
+    const until=Math.max(rateLimitUntil(this.store),this.now()+Math.ceil(delay*(1+Math.random()*0.1)));this.store.meta('rate_limit_until',until);
     this.schedule(until);this.status('rate-limited',{status:429});
   }
   async run(){
@@ -55,11 +66,13 @@ export class BrowserWorker {
     const due=Math.max(Number(this.store.meta('next_run_at') ?? 0),rateLimitUntil(this.store));if(due>this.now()){this.status('waiting');this.schedule(due);return;}
     this.busy=true;let api,interrupted=false,checkingConnection=verifying;const command=this.command,directoryOnly=this.mode==='ids',watching=watchNewRequested(this.store);
     try{
-      this.store.meta('connection_state','connecting');this.status('connecting');const paceMs=Math.max(this.config.paceMs,Number(this.store.meta('effective_pace_ms') ?? this.config.paceMs));
-      this.store.meta('effective_pace_ms',paceMs);api=new BrowserTransport(this.rpc,{...this.config,paceMs,successPaceMs:this.config.paceMs,
-        onBeforeRequest:()=>{if(!checkingConnection&&(pauseRequested(this.store)||syncCommand(this.store)!==command))throw new SyncPaused();},
+      const owner=randomUUID();this.store.acquire(owner);this.leaseOwner=owner;
+      const initial=!directoryOnly&&initialSyncPending(this.store),base=basePace(this.store,this.config);
+      this.store.meta('connection_state','connecting');this.status('connecting');const paceMs=Math.max(initial?this.config.initialMinPaceMs:base,Number(this.store.meta('effective_pace_ms') ?? base));
+      this.store.meta('effective_pace_ms',paceMs);api=new BrowserTransport(this.rpc,{...this.config,paceMs,
+        onBeforeRequest:()=>{this.store.acquire(owner);if(!checkingConnection&&(pauseRequested(this.store)||syncCommand(this.store)!==command))throw new SyncPaused();},
         nextRequestAt:Number(this.store.meta('next_request_at') ?? 0),onRequestStart:at=>this.store.meta('next_request_at',at),
-        onHistorySuccess:()=>{this.store.meta('effective_pace_ms',this.config.paceMs);this.store.meta('rate_limit_strikes',0);this.store.meta('rate_limit_until',0);},
+        paceAfterSuccess:()=>successfulRequest(this.store,this.config),
         onExchange:request=>this.store.meta('last_request',JSON.stringify(request))});
       const immediateHistory=this.store.meta('sync_resume_pending')==='1';
       this.store.meta('sync_resume_pending',0);
@@ -69,15 +82,16 @@ export class BrowserWorker {
       this.store.meta('connection_state','connected');this.store.meta('connection_requested',0);checkingConnection=false;
       if(api.workspace)this.store.meta('source_workspace',api.workspace);
       if(verifying){this.checkControl(false);if(this.paused){this.status('paused');return;}if(syncCommand(this.store)!==command)throw new SyncPaused();}
-      let auditQueued=0;if(!directoryOnly&&Number(this.store.meta('next_audit_at') ?? 0)<=this.now()){
+      let auditQueued=0;if(!directoryOnly&&!initial&&Number(this.store.meta('next_audit_at') ?? 0)<=this.now()){
         auditQueued=this.store.audit(new Date(this.now()-this.config.auditAgeMs).toISOString());this.store.meta('next_audit_at',this.now()+this.config.auditIntervalMs);
       }
       const nextDirectory=Number(this.store.meta('next_directory_at') ?? 0),scan=JSON.parse(this.store.meta('directory_scan') ?? 'null');
       const forceFull=this.store.meta('sync_force_full')==='1';
-      const skipDiscovery=!directoryOnly&&!forceFull&&!scan&&nextDirectory>this.now()&&Boolean(this.store.meta('discovery'));
+      const discovery=JSON.parse(this.store.meta('discovery')??'null');
+      const skipDiscovery=!directoryOnly&&!forceFull&&!scan&&discovery?.complete&&(initial?discovery.full:nextDirectory>this.now());
       this.status('syncing',{phase:skipDiscovery?'details':'directory'});
-      const result=await sync(api,this.store,{concurrency:1,max:this.config.maxPerRun,skipDiscovery,directoryOnly,newOnly:watching,full:directoryOnly&&!watching||forceFull,
-        maxDirectoryPages:this.config.maxDirectoryPages,projectIntervalMs:this.config.projectIntervalMs,directoryIntervalMs:this.config.directoryIntervalMs});
+      const result=await sync(api,this.store,{leaseOwner:owner,concurrency:1,max:initial?this.config.initialMaxPerRun:this.config.maxPerRun,skipDiscovery,directoryOnly,newOnly:watching,full:initial||directoryOnly&&!watching||forceFull,
+        initial,deferFailures:true,maxDirectoryPages:initial?this.config.initialDirectoryPages:this.config.maxDirectoryPages,projectIntervalMs:this.config.projectIntervalMs,directoryIntervalMs:this.config.directoryIntervalMs});
       result.auditQueued=auditQueued;this.store.meta('last_run',JSON.stringify(result));
       if(!skipDiscovery&&result.discovery.complete&&syncCommand(this.store)===command){
         this.store.meta('next_directory_at',this.now()+this.config.directoryIntervalMs);this.store.meta('sync_force_full',0);
@@ -95,15 +109,29 @@ export class BrowserWorker {
         });
         if(completed){this.pause(true);this.status('directory-complete');}else{this.checkControl(false);interrupted=true;}
       }
-      else{delay=(directoryOnly?result.discovery.pendingScopes:result.pending||result.discovery.pendingScopes)?this.config.pendingIntervalMs:this.config.directoryIntervalMs;
+      else{
+        if(!directoryOnly&&finishInitialSync(this.store,result,this.now())){
+          this.store.meta('effective_pace_ms',Math.max(this.config.paceMs,api.pace));this.store.meta('next_request_at',Math.max(api.next,this.now()+this.config.paceMs));
+        }
+        const remaining=directoryOnly?result.discovery.pendingScopes:result.pending||result.discovery.pendingScopes;
+        delay=remaining?this.config.pendingIntervalMs:this.config.directoryIntervalMs;
+        if(initial&&initialSyncPending(this.store)){
+          const ready=readyPayloads(this.store,1,this.now()).length;
+          const scopeErrors=result.discovery.errors?.length;
+          if(ready||result.discovery.pendingScopes&&!scopeErrors)delay=0;
+          else if(result.pending)delay=Math.max(this.config.pendingIntervalMs,(nextPayloadRetry(this.store,this.now())??this.now())-this.now());
+          else if(scopeErrors)delay=this.config.cooldownMs;
+        }
         this.schedule(this.now()+delay);this.status(result.ok?(watching?'watching-new':'up-to-date'):'pending',{fetched:result.fetched,changedMessages:result.changedMessages,elapsedMs:result.elapsedMs});}
     }catch(e){
       if(!this.closed){this.checkControl(false);if(e.code==='SYNC_PAUSED'){interrupted=true;this.status(this.paused?'paused':'pending');}
+        else if(e.code==='SYNC_BUSY'){this.schedule(this.now()+1000);this.status('waiting');}
         else{const status=e.status ?? null,state=[401,403].includes(status)?'login-required':'connection-error';
           this.store.meta('connection_state',status===429?'rate-limited':state);if(status===429)this.rateLimited(e);else{this.schedule(this.now()+this.config.cooldownMs);this.status(state,{status});}}}
-    }finally{api?.close();this.currentApi=null;this.busy=false;if(this.closed)this.onIdle?.();else if(interrupted&&!this.paused)this.schedule(Math.max(this.now(),Number(this.store.meta('next_run_at') ?? 0)));}
+    }finally{api?.close();if(this.leaseOwner){this.store.release(this.leaseOwner);this.leaseOwner=null;}this.currentApi=null;this.busy=false;if(this.closed){this.closeResolve?.();this.onIdle?.();}else if(interrupted&&!this.paused)this.schedule(Math.max(this.now(),Number(this.store.meta('next_run_at') ?? 0)));}
   }
   pause(value,{resume=true}={}){setSyncPaused(this.store,Boolean(value),this.now());this.pauseDesired=this.paused=Boolean(value);clearTimeout(this.timer);
     if(this.paused){this.currentApi?.pause();this.status('paused');}else if(resume)void this.run();}
-  close(){if(this.closed)return;this.closed=true;clearTimeout(this.timer);clearInterval(this.pulse);clearInterval(this.control);this.store.meta('worker_heartbeat_at',0);this.currentApi?.close();if(!this.busy)this.onIdle?.();}
+  close(){if(this.closed)return this.closing;this.closed=true;clearTimeout(this.timer);clearInterval(this.pulse);clearInterval(this.control);this.store.meta('worker_heartbeat_at',0);this.currentApi?.close();
+    this.closing=this.busy?new Promise(resolve=>this.closeResolve=resolve):Promise.resolve();if(!this.busy)this.onIdle?.();return this.closing;}
 }

@@ -4,6 +4,7 @@
 - [ ] Verify Claude and Gemini with real logged-in browser profiles: account/organization selection, old-history pagination, edits, rate limits and restart recovery. Synthetic protocol fixtures do not establish live compatibility.
 - [ ] Verify compact dashboard and Settings in a real browser, including hover/focus bubbles, column sorting, light/dark, narrow screens and 200% zoom. Current development browser blocked the isolated preview with `ERR_BLOCKED_BY_CLIENT`.
 - [ ] Establish Gemini long-conversation pagination before supporting responses at the 10,000-turn window. Current adapter rejects truncated windows and retains pending work.
+- [ ] Measure first-download throughput and 429 frequency with a real account using the adaptive defaults; compare against the previous 90-second interval without removing saved history or resetting cooldowns. Login cache tests cover timing and scope changes, not every website login implementation.
 - [ ] Measure long-running incremental sync and full-account coverage against an independently known directory. Automated fixtures cannot establish remote completeness.
 - [ ] Measure binary indexing time, disk growth and query/summary usefulness on a real large local archive. Verify a real AI client's bottom-up summary workflow; synthetic tests establish mechanics only.
 - [ ] Verify real OpenAI, Claude and Gemini API connections, supported text models, quotas and summary quality with explicit test accounts. Local HTTP protocol fixtures establish request conversion, not live cloud compatibility.

@@ -36,6 +36,15 @@ async function connected(t){
 }
 const result={summary:'有效摘要',inputTokens:10,outputTokens:5};
 
+test('first raw download defers automatic summaries without consuming quota or changing the selected model',async t=>{
+  const f=await connected(t);f.store.save(snapshot(tree('waiting'),'waiting'));configureSummary(f.store,{action:'run',running:true});
+  f.store.meta('sync_phase','initial');assert.equal(modelView(f.store).waitingForSync,true);
+  await summarizeNext(f.store,[f.store],{generate:()=>assert.fail('initial download must not call model')});
+  assert.equal(modelView(f.store).usage.requests,0);assert.equal(modelSettings(f.store).running,1);assert.equal(modelSettings(f.store).connection,f.id);
+  f.store.meta('sync_phase','maintenance');await summarizeNext(f.store,[f.store],{generate:async()=>result});
+  assert.equal(modelView(f.store).usage.requests,1);assert.equal(modelSettings(f.store).completed,1);
+});
+
 test('connections verify catalogs, protect credentials, survive reopen and isolate account settings',async t=>{
   const f=await connected(t),row=modelConnection(f.store,f.id);assert.equal(row.status,'connected');assert.equal(row.credential.includes('synthetic-key'),false);
   assert.equal(await revealCredential(f.store,row),'synthetic-key');assert.equal(JSON.stringify(modelView(f.store)).includes('synthetic-key'),false);

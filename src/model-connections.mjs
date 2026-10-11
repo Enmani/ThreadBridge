@@ -3,6 +3,7 @@ import {fileURLToPath} from 'node:url';
 import {modelEndpoint,modelError,discoverModels} from './model-transport.mjs';
 import {protectCredential,revealCredential,forgetCredential} from './model-credentials.mjs';
 import {indexEnabled,indexStatus} from './chat-index.mjs';
+import {initialSyncPending} from './sync-policy.mjs';
 
 export function modelConnection(store,id){return store.db.prepare('SELECT * FROM model_connections WHERE account=? AND id=?').get(store.accountName,id);}
 export function modelSettings(store){
@@ -13,7 +14,7 @@ export function modelView(store,providers=[store.provider]){
   const items=store.db.prepare('SELECT * FROM model_connections WHERE account=? ORDER BY name,id').all(store.accountName);
   const settings=modelSettings(store),day=new Date().toISOString().slice(0,10);
   const usage=store.db.prepare('SELECT requests,input_tokens,output_tokens FROM model_index_usage WHERE account=? AND day=?').get(store.accountName,day)??{requests:0,input_tokens:0,output_tokens:0};
-  return {indexEnabled:providers.every(p=>indexEnabled(store.scope(p))),pendingSummaries:providers.reduce((n,p)=>n+indexStatus(store.scope(p)).pendingSummaries,0),items:items.map(row=>({id:row.id,name:row.name,kind:row.kind,protocol:row.protocol,endpoint:row.base_url,
+  return {waitingForSync:providers.some(p=>initialSyncPending(store.scope(p))),indexEnabled:providers.every(p=>indexEnabled(store.scope(p))),pendingSummaries:providers.reduce((n,p)=>n+indexStatus(store.scope(p)).pendingSummaries,0),items:items.map(row=>({id:row.id,name:row.name,kind:row.kind,protocol:row.protocol,endpoint:row.base_url,
     status:row.kind==='client'?(store.db.prepare('SELECT 1 FROM model_client_sessions WHERE account=? AND connection=? AND expires>?').get(store.accountName,row.id,Date.now())?'connected':'waiting-client'):row.status,
     models:JSON.parse(row.catalog),checkedAt:row.checked_at,error:row.error,
     ...(row.kind==='client'?{config:{mcpServers:Object.fromEntries(providers.map(provider=>['threadbridge-'+provider,{command:process.execPath,

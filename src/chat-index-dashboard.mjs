@@ -1,4 +1,5 @@
 import {indexStatus,updateIndex} from './chat-index.mjs';
+import {initialSyncPending} from './sync-policy.mjs';
 
 export function dashboardIndex(stores){
   const items=stores.map(indexStatus),sum=key=>items.reduce((n,s)=>n+s[key],0);
@@ -19,6 +20,7 @@ export function configureIndex(root,providers,value){
 export function startIndexing(server,getStores){
   let timer;const reported=new Set();
   const tick=()=>{for(const store of getStores()){
+    if(initialSyncPending(store))continue;
     try{updateIndex(store,{limit:1});reported.delete(store.provider);}
     catch(error){if(!reported.has(store.provider)){
       process.stderr.write(`Chat index update failed (${store.provider}, ${error.code??'database error'}); pending work retained.\n`);reported.add(store.provider);

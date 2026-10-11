@@ -3,10 +3,12 @@ import {modelConnection,modelSettings} from './model-connections.mjs';
 import {revealCredential} from './model-credentials.mjs';
 import {generateSummary} from './model-transport.mjs';
 import {summaryTasks,saveSummary,indexStatus} from './chat-index.mjs';
+import {initialSyncPending} from './sync-policy.mjs';
 
 export async function summarizeNext(root,stores,{signal,generate=generateSummary,isClosed=()=>false}={}){
   if(signal?.aborted)return;
   if(stores.some(s=>s.accountName!==root.accountName||s.db!==root.db))throw new Error('Summary stores must share the account and database');
+  if(stores.some(initialSyncPending))return;
   const owner=randomUUID(),account=root.accountName,day=new Date().toISOString().slice(0,10);
   const work=root.transaction(()=>{
     const settings=modelSettings(root);if(!settings.running)return null;

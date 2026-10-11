@@ -19,12 +19,12 @@ function checkOrder(j,items){
     if(j.previous&&s.updated>j.previous)j.ordered=false;j.previous=s.updated;}
 }
 function nextCursor(j,data){
-  const next=data.cursor ?? null;if(next!=null){const key=String(next);if(j.seenCursors.includes(key))throw new Error('Directory cursor did not advance');j.seenCursors.push(key);}
+  const next=Object.hasOwn(data,'next_cursor')?data.next_cursor:data.cursor ?? null;if(next!=null){const key=String(next);if(j.seenCursors.includes(key))throw new Error('Directory cursor did not advance');j.seenCursors.push(key);}
   j.cursor=next;return next==null;
 }
 
 export async function discover(api,store,{full=false,refresh=false,pageSize=100,overlapMs=3600000,projectIds=[],
-  maxDirectoryPages=100000,projectIntervalMs=0,directoryIntervalMs=300000,directoryOnly=false,newOnly=false}={}){
+  maxDirectoryPages=100000,projectIntervalMs=0,directoryIntervalMs=300000,directoryOnly=false,newOnly=false,initial=false}={}){
   if(!Number.isSafeInteger(maxDirectoryPages)||maxDirectoryPages<1||maxDirectoryPages>100000)throw new Error('Invalid directory page budget');
   const now=Date.now(),started=new Date(now).toISOString();let state=JSON.parse(store.meta('directory_scan') ?? 'null');
   if(state?.version!==1||(refresh&&!state?.refresh)||(full&&!state?.full)||Boolean(state?.newOnly)!==newOnly)state=null;
@@ -43,7 +43,7 @@ export async function discover(api,store,{full=false,refresh=false,pageSize=100,
     job(store,'projects','sidebar',started,true,overlapMs)]};
     if(full)for(const endpoint of ['/backend-api/projects','/backend-api/gizmos/discovery/mine'])state.jobs.push(job(store,endpoint,'optional',started,true,overlapMs,{endpoint}));
     for(const p of projects)addProject(p,full);
-  }else if(!directoryOnly){
+  }else if(!directoryOnly&&!initial){
     // Refresh recent chats even while the initial project scan is still in progress.
     const urgent=[];for(const [scope,kind,extra] of [['active','chats',{archived:false}],['archived','chats',{archived:true}],['projects','sidebar',{}]]){
       const previous=state.jobs.find(j=>j.scope===scope),last=readLedger(store,scope);

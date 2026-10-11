@@ -25,5 +25,7 @@ export function combinedStatus(statuses){
     lastRequest:recent('lastRequest'),lastCapture:recent('lastCapture'),activeScan:statuses.some(s=>s.activeScan)?{scopes:statuses.flatMap(s=>s.activeScan?.scopes??[]),pendingScopes:statuses.reduce((n,s)=>n+(s.activeScan?.pendingScopes??0),0)}:null,
     background:{...(first.background??{}),state,paceMs:Math.max(...active.map(s=>s.background?.paceMs??0),0)},
     runtime:{...first.runtime,connected:statuses.some(s=>s.runtime.connected),paused:statuses.every(s=>s.runtime.paused),complete:statuses.every(s=>s.runtime.complete),nextAt:next.length?Math.min(...next):null,
+      phase:statuses.some(s=>s.runtime.phase==='initial'&&s.runtime.mode==='full')?'initial':first.runtime.phase,
+      scopeIssues:statuses.flatMap(s=>s.runtime.scopeIssues.map(issue=>({...issue,provider:s.provider}))),failedThreads:sum('errors'),
       mode:statuses.every(s=>s.runtime.mode===first.runtime.mode)?first.runtime.mode:'mixed',watchNew:statuses.every(s=>s.runtime.watchNew)}};
 }

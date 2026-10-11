@@ -40,6 +40,8 @@ Load `extension/` as an unpacked extension in Chrome or Edge, then register its 
 
 The installer starts with ChatGPT. Open Settings → Add platform to add Claude or Gemini using the same browser profile. Settings displays Connected only after login validation; adding a platform does not switch the history view. Claude organizations and Gemini account indices can be specified when adding. Sync progress and cooldowns survive restarts; closing the browser stops collection. Directory-only mode does not request conversation bodies. ChatGPT browsing archives are controlled separately.
 
+The first download runs serially with a 3-second starting interval, gradually approaching 2 seconds after successful windows. It checkpoints each conversation and directory page, prioritizes unread threads over failed retries, and defers automatic indexing and model summaries. After required directories and payloads complete, it switches to the existing slower maintenance settings. Rate limits persist across restarts and honor `Retry-After`; recovery is gradual. See [sync configuration](NATIVE-SETUP.md).
+
 ## MCP
 
 [codex-mcp.example.toml](codex-mcp.example.toml) shows separate local-only servers for each provider. Replace its absolute paths before use. Each exposes `list_threads`, `search_history`, `fetch_threads`, `get_changes`, `ack_changes`, `get_sync_status` and `chat_index`. CLI commands accept `--provider chatgpt|claude|gemini` (default: ChatGPT).

@@ -112,7 +112,7 @@ test('background defaults and rate-limit slowdowns are durable and do not start 
   assert.equal(defaults.maxDirectoryPages,3);assert.equal(defaults.maxPerRun,5);
   assert.equal(defaults.cooldownMs,120000);
   const rpc={closed:false,send(){},async request(p){return p==='/api/auth/session'?{status:200,identity:'user'}:{status:429,identity:'user'};}};
-  const before=Date.now(),worker=new BrowserWorker(rpc,f.store,{...defaults,paceMs:20});try{
+  const before=Date.now(),worker=new BrowserWorker(rpc,f.store,{...defaults,paceMs:20,initialPaceMs:20,initialMinPaceMs:20});try{
     await worker.run();assert.equal(f.store.meta('effective_pace_ms'),'40');assert.equal(f.store.meta('worker_state'),'rate-limited');
     assert.ok(Number(f.store.meta('next_run_at'))>=before+120000);
     const again=Date.now();worker.rateLimited({});assert.equal(f.store.meta('effective_pace_ms'),'80');
@@ -145,7 +145,7 @@ test('legacy database migration preserves snapshots and acknowledgements and bac
 test('bounded background batches interleave history pages and details, then finish after worker replacement',async t=>{
   const f=await fixture(t),paths=[],rpc={closed:false,send(){},async request(p){paths.push(p);
     return p==='/api/auth/session'?{status:200,identity:'user'}:{status:200,identity:'user',data:await f.api.request(p)};}};
-  const settings=workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0});
+  const settings=workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:5,initialDirectoryPages:3});
   let worker=new BrowserWorker(rpc,f.store,settings);
   try{
     await worker.run();assert.equal(f.store.status().fullTrees,5);
