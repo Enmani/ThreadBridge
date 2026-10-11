@@ -18,7 +18,7 @@ export function dashboardStatus(store,now=Date.now()){
   const status=store.status(),worker=status.background,connected=Boolean(worker?.heartbeatAt&&now-worker.heartbeatAt<45000);
   const paused=pauseRequested(store),nextAt=connected&&!paused&&!['paused','account-changed'].includes(worker.state)?Math.max(worker.nextRunAt,worker.nextRequestAt):null;
   const textArchives=store.db.prepare("SELECT COUNT(*) AS n FROM threads WHERE account=? AND revision>0 AND coverage='bounded-text'").get(store.account).n;
-  const scopes=(status.activeScan??status.discovery)?.scopes??[],names=JSON.parse(store.meta('project_names')??'{}');
+  const scopes=((status.activeScan??status.discovery)?.scopes??[]).map(({complete,...scope})=>({...scope,done:scope.done??complete})),names=JSON.parse(store.meta('project_names')??'{}');
   return {...status,app:'threadbridge',textArchives,runtime:{connected,paused,nextAt,now,mode:syncMode(store),phase:store.meta('sync_phase'),initialCompletedAt:store.meta('initial_sync_completed_at'),
     scopeIssues:scopes.filter(s=>s.stopReason==='unavailable'||!s.done).map(s=>({...s,projectName:names[s.scope.replace(/^project:/,'')]??null})),failedThreads:status.errors,complete:syncComplete(store),finishedAt:store.meta('sync_finished_at'),
     browserArchive:store.provider==='chatgpt'&&browserArchiveEnabled(store),browserArchiveReady:store.provider==='chatgpt'&&connected&&store.meta('browser_archive_version')==='1',

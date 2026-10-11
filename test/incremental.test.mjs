@@ -91,6 +91,7 @@ test('recent-head checks find new threads while an initial history page cursor r
   f.store.meta('directory_head:active',new Date(Date.now()-1200000).toISOString());
   f.records.set('urgent-new',tree('urgent-new',undefined,Date.now()/1000+2));f.active.unshift('urgent-new');
   const at=f.requests.length,run=await sync(f.api,f.store,{maxDirectoryPages:1,max:1,directoryIntervalMs:900000});
+  assert.equal(run.discovery.errors.length,0,JSON.stringify(run.discovery));
   assert.equal(f.requests[at].includes('offset=0&'),true);assert.ok(f.store.read('urgent-new'));
   const state=JSON.parse(f.store.meta('directory_scan'));assert.equal(state.jobs.find(j=>j.scope==='active').offset,7);
   assert.ok(run.discovery.scopes.some(s=>s.scope==='active:recent'));

@@ -12,7 +12,7 @@ import {BrowserWorker,workerConfig} from '../src/browser-worker.mjs';
 import {hostConfigs} from '../src/browser-config.mjs';
 import {BrowserTransport} from '../src/browser-transport.mjs';
 import {frame,FrameReader} from '../src/browser-frames.mjs';
-import {createDashboard} from '../src/dashboard-server.mjs';
+import {createDashboard,dashboardStatus} from '../src/dashboard-server.mjs';
 import {addConnection} from '../src/connections.mjs';
 import {fixture,tree} from './fixtures.mjs';
 import {claudeDirectory,claudeDetail,geminiDirectory,geminiDetail} from './provider-fixtures.mjs';
@@ -110,6 +110,7 @@ test('each provider background worker resumes bodies, detects edits and persists
   const cw=new BrowserWorker(crpc,c,settings(f.db,'claude')),gw=new BrowserWorker(grpc,g,settings(f.db,'gemini'));
   try{
     await Promise.all([cw.run(),gw.run()]);assert.equal(c.status().pending,0);assert.equal(c.status().messages,3);assert.equal(g.status().threads,0);
+    assert.equal(c.meta('sync_phase'),'maintenance');assert.deepEqual(dashboardStatus(c).runtime.scopeIssues,[]);
     assert.equal(gw.rpc.notices.at(-1).state,'rate-limited');assert.ok(Number(g.meta('rate_limit_until'))>Date.now()+3590000);assert.equal(c.meta('rate_limit_until'),'0');
     const before=grpc.paths.length;gw.close();const resumed=new BrowserWorker(grpc,g,settings(f.db,'gemini'));await resumed.run();resumed.close();assert.equal(grpc.paths.length,before);
     c.meta('next_run_at',0);await cw.run();assert.equal(c.status().messages,3);assert.equal(c.read('same-id').revision,1);

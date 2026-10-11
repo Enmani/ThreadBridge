@@ -52,7 +52,7 @@ test('an unreadable mandatory project remains unfinished after saving every know
   rpc.request=path=>path.includes('/g-p-hidden/conversations')?Promise.resolve({status:404,identity:'user'}):request(path);
   const worker=new BrowserWorker(rpc,f.store,settings(f,{initialMaxPerRun:100,initialDirectoryPages:100000}));
   try{await worker.run();assert.equal(f.store.status().pending,0);assert.ok(initialSyncPending(f.store));
-    assert.equal(f.store.meta('initial_sync_completed_at'),null);assert.ok(dashboardStatus(f.store).runtime.scopeIssues.some(s=>s.scope==='project:g-p-hidden'&&!s.done));
+    assert.equal(f.store.meta('initial_sync_completed_at'),null);assert.ok(dashboardStatus(f.store).runtime.scopeIssues.some(s=>s.scope==='project:g-p-hidden'&&!s.done),f.store.meta('last_run'));
   }finally{await worker.close();}
 });
 
