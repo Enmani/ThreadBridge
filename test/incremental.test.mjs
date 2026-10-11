@@ -91,6 +91,7 @@ test('recent-head checks find new threads while an initial history page cursor r
   f.store.meta('directory_head:active',new Date(Date.now()-1200000).toISOString());
   f.records.set('urgent-new',tree('urgent-new',undefined,Date.now()/1000+2));f.active.unshift('urgent-new');
   const at=f.requests.length,run=await sync(f.api,f.store,{maxDirectoryPages:1,max:1,directoryIntervalMs:900000});
+  assert.equal(run.discovery.errors.length,0,JSON.stringify(run.discovery));
   assert.equal(f.requests[at].includes('offset=0&'),true);assert.ok(f.store.read('urgent-new'));
   const state=JSON.parse(f.store.meta('directory_scan'));assert.equal(state.jobs.find(j=>j.scope==='active').offset,7);
   assert.ok(run.discovery.scopes.some(s=>s.scope==='active:recent'));
@@ -112,7 +113,7 @@ test('background defaults and rate-limit slowdowns are durable and do not start 
   assert.equal(defaults.maxDirectoryPages,3);assert.equal(defaults.maxPerRun,5);
   assert.equal(defaults.cooldownMs,120000);
   const rpc={closed:false,send(){},async request(p){return p==='/api/auth/session'?{status:200,identity:'user'}:{status:429,identity:'user'};}};
-  const before=Date.now(),worker=new BrowserWorker(rpc,f.store,{...defaults,paceMs:20});try{
+  const before=Date.now(),worker=new BrowserWorker(rpc,f.store,{...defaults,paceMs:20,initialPaceMs:20,initialMinPaceMs:20});try{
     await worker.run();assert.equal(f.store.meta('effective_pace_ms'),'40');assert.equal(f.store.meta('worker_state'),'rate-limited');
     assert.ok(Number(f.store.meta('next_run_at'))>=before+120000);
     const again=Date.now();worker.rateLimited({});assert.equal(f.store.meta('effective_pace_ms'),'80');
@@ -145,7 +146,7 @@ test('legacy database migration preserves snapshots and acknowledgements and bac
 test('bounded background batches interleave history pages and details, then finish after worker replacement',async t=>{
   const f=await fixture(t),paths=[],rpc={closed:false,send(){},async request(p){paths.push(p);
     return p==='/api/auth/session'?{status:200,identity:'user'}:{status:200,identity:'user',data:await f.api.request(p)};}};
-  const settings=workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0});
+  const settings=workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:5,initialDirectoryPages:3});
   let worker=new BrowserWorker(rpc,f.store,settings);
   try{
     await worker.run();assert.equal(f.store.status().fullTrees,5);

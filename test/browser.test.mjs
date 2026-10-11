@@ -14,7 +14,7 @@ import {pageRequest} from '../extension/page-client.js';
 import {fixture,tree} from './fixtures.mjs';
 
 const extensionId='a'.repeat(32);
-function config(db,extra={}){return workerConfig({db,account:'test',extensionId,paceMs:0,maxDirectoryPages:100000,projectIntervalMs:0,...extra});}
+function config(db,extra={}){return workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:extra.maxPerRun??5,initialDirectoryPages:100000,db,account:'test',extensionId,paceMs:0,maxDirectoryPages:100000,projectIntervalMs:0,...extra});}
 function browserRpc(f,identity='test-user'){
   return {closed:false,identity,notices:[],paths:[],send(value){this.notices.push(value);},async request(p){this.paths.push(p);
     if(p==='/api/auth/session')return {status:200,identity:this.identity};
@@ -96,9 +96,9 @@ test('real native host subprocess completes framed browser-to-disk flow and resu
     const deadline=setTimeout(()=>{child.kill();reject(new Error('Native integration timed out'));},15000);
     const finish=value=>{if(completed)return;completed=value;child.stdin.end(frame({type:'shutdown'}));};
     const reader=new FrameReader(message=>{
-      if(message.type==='request'){void (async()=>{const result=message.path==='/api/auth/session'?{status:200,identity:'test-user'}:
+      if(message.type==='request'&&!completed){void (async()=>{const result=message.path==='/api/auth/session'?{status:200,identity:'test-user'}:
         await f.api.request(message.path).then(data=>({status:200,identity:'test-user',data}),e=>({status:e.status,identity:'test-user'}));
-        if(!child.stdin.destroyed){const bytes=frame({type:'response',id:message.id,result},64*1024*1024);child.stdin.write(bytes.subarray(0,2));child.stdin.write(bytes.subarray(2));}})().catch(reject);}
+        if(!child.stdin.destroyed&&!child.stdin.writableEnded){const bytes=frame({type:'response',id:message.id,result},64*1024*1024);child.stdin.write(bytes.subarray(0,2));child.stdin.write(bytes.subarray(2));}})().catch(reject);}
       else if(message.type==='status'&&['pending','up-to-date'].includes(message.state))finish(message);
     });
     child.stdout.on('data',b=>reader.push(b));child.stderr.on('data',b=>error+=b);child.on('error',reject);child.on('close',code=>{if(!settled){settled=true;clearTimeout(deadline);if(code===0&&completed)resolve(completed);else reject(new Error('Native host exited '+code+': '+error));}});
@@ -113,7 +113,7 @@ test('real native host subprocess completes framed browser-to-disk flow and resu
 test('native host refuses a foreign extension origin before creating its database',async t=>{
   const f=await fixture(t),settings=path.join(f.dir,'host.json'),db=path.join(f.dir,'forbidden.sqlite');writeFileSync(settings,JSON.stringify(config(db)));
   const result=await new Promise(resolve=>{const child=spawn(process.execPath,['src/browser-host.mjs','--config',settings,`chrome-extension://${'b'.repeat(32)}/`]);child.stdin.end();child.on('close',code=>resolve(code));});
-  assert.equal(result,1);assert.throws(()=>workerConfig({...config(db),extensionId:'not-an-extension'}),/extension/);
+  assert.equal(result,1);assert.throws(()=>workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:5,initialDirectoryPages:3,...config(db),extensionId:'not-an-extension'}),/extension/);
 });
 test('local-only Codex MCP exposes local tools and refuses online sync even when explicitly called',async t=>{
   const f=await fixture(t),requests=[{jsonrpc:'2.0',id:1,method:'tools/list'},

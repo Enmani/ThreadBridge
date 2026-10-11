@@ -1,4 +1,7 @@
 export const labels={heading:'聊天同步',theme:'切换主题',status:'同步状态',lastRequest:'最近请求',lastSaved:'最近保存',nextRequest:'下次请求',
+  initialSync:'首次同步',maintenanceSync:'日常同步',summaryWaitingSync:'等待首次同步完成',
+  initialSyncNote:'首次连续下载；完成后低频检查更新。',
+  syncIssues:(pending,failed,unavailable)=>[pending?`${pending} 个目录未完成`:'',failed?`${failed} 个线程读取失败`:'',unavailable?`${unavailable} 个补充目录不可用`:''].filter(Boolean).join(' · '),
   chatIndex:'聊天索引',indexPurpose:'帮助 AI 快速查找聊天',indexEnabled:'启用索引',indexSummaryMode:'全文可查，摘要待生成',
   modelConnections:'模型连接',addModel:'添加模型',connectModel:'连接模型',connectionName:'连接名称',connectionKind:'接入方式',modelService:'模型服务',
   cloudApi:'云端服务',localModel:'本地模型',aiClient:'客户端',compatibleApi:'兼容接口',serviceAddress:'服务地址',modelKey:'访问密钥',modelKeyNote:'密钥只保存在本机后端。',

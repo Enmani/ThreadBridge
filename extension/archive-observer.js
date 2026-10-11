@@ -3,7 +3,8 @@
   if (window.__threadbridgeObserver) return;
   window.__threadbridgeObserver = true;
   const channel = 'threadbridge-browser-archive-v1', maxBytes = 32 * 1024 * 1024;
-  let enabled = false, identity = null, workspace, personalAccount = null, bootstrapAllowed=true, wasEnabled=false;
+  let enabled = false, identity = null, workspace, bootstrapAllowed=true, wasEnabled=false;
+  const personalAccounts = new Set();
   let timer, lastRoute = '', receivedTreeRoute='', lastState='', previousIds = new Set(), seen = new Map();
   const post = value => window.postMessage({channel, ...value}, location.origin);
   const route = () => {
@@ -15,16 +16,29 @@
   function setIdentity(user) {
     if (typeof user !== 'string' || !user.startsWith('user-')) return false;
     if (identity && identity !== user) {
-      seen.clear(); previousIds.clear(); workspace=undefined; personalAccount=null;
+      seen.clear(); previousIds.clear(); workspace=undefined; personalAccounts.clear();
     }
     identity=user; return true;
+  }
+  function setWorkspace(value) {
+    // A rejected page may already be deduplicated. Retry its visible messages when scope is corrected.
+    if(workspace!==value)seen.clear();
+    workspace=value;
+  }
+  function rememberPersonal(account, dictionaryKey) {
+    const explicit=[account?.account_id,account?.id].filter(id=>typeof id==='string'&&id&&id!=='default');
+    const ids=explicit.length?explicit:[dictionaryKey].filter(id=>typeof id==='string'&&id&&id!=='default');
+    // `default` without an actual ID proves no ownership; do not replace IDs learned from the session.
+    for(const id of ids)personalAccounts.add(id);
+    if(personalAccounts.has(workspace))setWorkspace(null);
   }
   function sessionContext(session) {
     if (!setIdentity(session?.user?.id)) return;
     const account=session.account;
-    if (typeof account?.id==='string' && ['personal','workspace','team'].includes(account.structure)) {
-      if(account.structure==='personal') personalAccount=account.id;
-      if(workspace===undefined || workspace===account.id) workspace=account.structure==='personal'?null:account.id;
+    const id=account?.id ?? account?.account_id;
+    if (typeof id==='string' && ['personal','workspace','team'].includes(account.structure)) {
+      if(account.structure==='personal')rememberPersonal(account);
+      if(workspace===undefined || workspace===id)setWorkspace(account.structure==='personal'?null:id);
     }
     if(typeof session.accessToken==='string')context({authorization:'Bearer '+session.accessToken});
   }
@@ -53,7 +67,7 @@
       setIdentity(user);
     } catch { /* A non-JWT token cannot establish identity. */ }
     const account = h.get('chatgpt-account-id') ?? tokenAccount;
-    if (account) workspace = account === personalAccount ? null : account;
+    if (account)setWorkspace(personalAccounts.has(account)?null:account);
     return {identity,workspace,account};
   }
   async function inspect(response, request) {
@@ -79,16 +93,15 @@
       if (request.path.startsWith('/backend-api/accounts/check')) {
         for (const [id,entry] of Object.entries(body.accounts ?? {})) {
           // `default` is a dictionary alias, not the account ID sent in request headers.
-          if (entry?.account?.structure === 'personal') personalAccount=entry.account.account_id ?? entry.account.id ?? id;
+          if (entry?.account?.structure === 'personal')rememberPersonal(entry.account,id);
         }
-        if (workspace === personalAccount) workspace=null;
         schedule(); return;
       }
       const current = route();
       if (!current || request.id !== current.id || !request.identity || request.identity !== identity) return;
       const raw = body.conversation ?? body;
       if (!raw.mapping || !raw.current_node || (raw.conversation_id ?? raw.id) !== current.id) return;
-      const scope = request.account === personalAccount ? null : request.workspace;
+      const scope = personalAccounts.has(request.account) ? null : request.workspace;
       post({type:'capture',payload:{...current,title:String(raw.title ?? document.title).slice(0,1000),
         kind:'tree',identity:request.identity,workspace:scope,requestedAt:request.requestedAt,raw}});
       receivedTreeRoute=current.id;
@@ -165,7 +178,7 @@
   function capturePage() {
     timer=null; if(!enabled)return;
     const current=route(); if(!current)return;
-    if(!identity || workspace===undefined)bootstrapSession();
+    if(!identity || workspace===undefined || !personalAccounts.size)bootstrapSession();
     if(!identity || workspace===undefined){report('waiting-account');return;}
     const selector='[data-message-author-role],[data-chatgpt-search-message-ids],.group\\/user-message,[data-conversation-role="assistant"]';
     const nodes=Array.from(document.querySelectorAll(selector)), ids=new Set(), messages=[];
@@ -196,7 +209,7 @@
     if(event.source!==window || event.origin!==location.origin || event.data?.channel!==channel)return;
     if(event.data.type==='settings'){enabled=event.data.enabled===true;if(enabled){wasEnabled=true;bootstrapSession();schedule();}else{
       if(wasEnabled)bootstrapAllowed=false; // After a disabled interval, the initial document session may be stale.
-      clearTimeout(timer);seen.clear();identity=null;workspace=undefined;personalAccount=null;lastState='';
+      clearTimeout(timer);seen.clear();identity=null;workspace=undefined;personalAccounts.clear();lastState='';
     }}
     // Retry page fragments when durable local enqueue failed; never retry remote reads.
     if(event.data.type==='retry'){seen.clear();schedule();}

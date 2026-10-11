@@ -220,7 +220,7 @@ export class Store {
   acquire(owner,ttl=120000) {
     return this.transaction(()=>{
       const lease=this.db.prepare('SELECT * FROM leases WHERE account=?').get(this.account);
-      if (lease && lease.expires>Date.now() && lease.owner!==owner) throw new Error('Another sync is already running');
+      if (lease && lease.expires>Date.now() && lease.owner!==owner) throw Object.assign(new Error('Another sync is already running'),{code:'SYNC_BUSY'});
       this.db.prepare('INSERT OR REPLACE INTO leases VALUES(?,?,?)').run(this.account,owner,Date.now()+ttl);
     });
   }

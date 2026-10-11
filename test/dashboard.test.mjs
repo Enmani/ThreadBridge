@@ -55,7 +55,7 @@ test('live request status and each successful save are visible to another databa
     if(p.startsWith('/backend-api/conversation/')&&reader.status().lastCapture)sawSave=true;
     return {status:200,identity:'user',data:await f.api.request(p)};
   }};
-  const worker=new BrowserWorker(rpc,f.store,workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,maxDirectoryPages:100000,maxPerRun:2}));
+  const worker=new BrowserWorker(rpc,f.store,workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:2,initialDirectoryPages:100000,db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,maxDirectoryPages:100000,maxPerRun:2}));
   try{await worker.run();assert.equal(sawSave,true);assert.equal(sawRequest,true);assert.equal(reader.status().lastRequest.status,200);assert.equal(reader.status().fullTrees,2);}
   finally{worker.close();worker.close();assert.equal(reader.status().background.heartbeatAt,0);reader.close();}
 });

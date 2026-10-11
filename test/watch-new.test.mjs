@@ -11,7 +11,7 @@ const rpcFor=f=>({closed:false,send(){},async request(path){
   if(path==='/api/auth/session')return {status:200,identity:'user'};
   try{return {status:200,identity:'user',data:await f.api.request(path)};}catch(e){return {status:e.status??503,identity:'user',data:{}};}
 }});
-const config=f=>workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,maxDirectoryPages:100000,projectIntervalMs:0});
+const config=f=>workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:5,initialDirectoryPages:100000,db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,maxDirectoryPages:100000,projectIntervalMs:0});
 
 test('new-ID watch skips the old body backlog and old edits, discovers new IDs once and waits for another poll',async t=>{
   const f=await fixture(t);await sync(f.api,f.store,{max:0});const old=f.store.thread('chat-0');

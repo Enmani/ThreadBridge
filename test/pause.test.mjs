@@ -7,7 +7,7 @@ import {sync} from '../src/sync.mjs';
 import {setSyncPaused} from '../src/sync-control.mjs';
 import {fixture} from './fixtures.mjs';
 
-const config=(f,extra={})=>workerConfig({db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,maxDirectoryPages:1,maxPerRun:1,...extra});
+const config=(f,extra={})=>workerConfig({initialPaceMs:extra.paceMs??0,initialMinPaceMs:extra.paceMs??0,initialMaxPerRun:extra.maxPerRun??1,initialDirectoryPages:1,db:f.db,account:'test',extensionId:'a'.repeat(32),paceMs:0,maxDirectoryPages:1,maxPerRun:1,...extra});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
 test('pause control is same-origin JSON only, bounded, idempotent, account-scoped and visible after reopening',async t=>{
@@ -71,7 +71,7 @@ test('database control polling cancels a long queued wait and resumes without br
     const deadline=Date.now()+2500;while(calls.length<3&&Date.now()<deadline)await sleep(25);
     assert.equal(worker.paused,false);assert.equal(calls.length,3);assert.ok(calls[2].startsWith('/backend-api/conversations?'));
     assert.ok(Number(f.store.meta('next_run_at'))<due);
-  }finally{worker.close();writer.close();}
+  }finally{await worker.close();writer.close();}
 });
 
 test('an in-flight 429 still persists its server cooldown while the user has paused',async t=>{

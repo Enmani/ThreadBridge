@@ -3,6 +3,7 @@ import {snapshot} from './model.mjs';
 import {discover} from './discovery.mjs';
 import {discoverProvider} from './provider-discovery.mjs';
 import {providerSnapshot,detailPath} from './providers.mjs';
+import {readyPayloads,deferPayload} from './sync-policy.mjs';
 
 async function workers(items,concurrency,fn,stopped=()=>false) {
   let index=0;
@@ -12,7 +13,7 @@ async function workers(items,concurrency,fn,stopped=()=>false) {
   const failure=results.find(r=>r.status==='rejected');if(failure)throw failure.reason;
 }
 export async function sync(api,store,options={}) {
-  const owner=randomUUID(); store.acquire(owner);
+  const owner=options.leaseOwner??randomUUID(); store.acquire(owner);
   let leaseError=null;
   const heartbeat=setInterval(()=>{try{store.acquire(owner);}catch(e){leaseError=e;}},30000);
   const started=new Date().toISOString(); const t0=performance.now();
@@ -27,16 +28,19 @@ export async function sync(api,store,options={}) {
     result.timings={directoryMs:Math.round(performance.now()-directoryStarted)};const detailsStarted=performance.now();
     if(!result.discovery)throw new Error('No directory scan to resume');
     stopped=api.stopped ?? null;
-    const pending=options.directoryOnly?[]:store.pending(options.max ?? 100000);
+    const pending=options.directoryOnly?[]:options.deferFailures?readyPayloads(store,options.max??100000):store.pending(options.max ?? 100000);
     const save=(detail,item)=>{
       if(leaseError)throw leaseError;store.acquire(owner);
       const parsed=providerSnapshot(store.provider,detail,item.id,item.title);
-      const change=store.save(parsed,item.source_updated,item.source_assistant); result.fetched++;result.changedMessages+=change.changed;
+      const change=store.transaction(()=>{const change=store.save(parsed,item.source_updated,item.source_assistant);store.meta('payload_retry:'+item.id,'null');return change;});
+      result.fetched++;result.changedMessages+=change.changed;
     };
     const single=async item=>{
       if (leaseError) throw leaseError;
       try {save(await api.request(detailPath(store.provider,item.id)),item);if(api.stopped)stopped=api.stopped;}
-      catch(e) {if(e.code==='SYNC_PAUSED'){stopped=e;return;}store.fail(item.id,e.message);result.failures.push({id:item.id,error:e.message});if(api.stopped)stopped=api.stopped;else if([401,403,429].includes(e.status))stopped=e;}
+      catch(e) {if(e.code==='SYNC_PAUSED'){stopped=e;return;}store.fail(item.id,e.message);result.failures.push({id:item.id,error:e.message});
+        if(options.deferFailures&&!api.stopped&&![401,403,429].includes(e.status))deferPayload(store,item.id);
+        if(api.stopped)stopped=api.stopped;else if([401,403,429].includes(e.status))stopped=e;}
     };
     if (options.batch) {
       for (let i=0;i<pending.length;i+=10) {

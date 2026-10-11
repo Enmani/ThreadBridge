@@ -19,6 +19,6 @@
 
 Browser extension → Native Messaging host → validated conversation models → account-scoped SQLite → CLI, MCP and dashboard.
 
-`src/transport.mjs` and `src/browser-transport.mjs` handle remote reads. `src/discovery.mjs` enumerates directories; `src/sync.mjs` coordinates content reads. `src/model.mjs` validates trees. `src/store.mjs` stores archives, revisions and change cursors. Browser and text imports have separate storage adapters so partial content cannot replace full trees. `src/native.mjs` provides the optional Codex pipe adapter.
+`src/transport.mjs` and `src/browser-transport.mjs` handle remote reads. `src/discovery.mjs` enumerates directories; `src/sync.mjs` coordinates content reads. `src/sync-policy.mjs` owns initial/maintenance phases, adaptive recovery and durable payload retries; login and history dispatch share an account lease. `src/model.mjs` validates trees. `src/store.mjs` stores archives, revisions and change cursors. Browser and text imports have separate storage adapters so partial content cannot replace full trees. `src/native.mjs` provides the optional Codex pipe adapter.
 
 Database schemas are created and upgraded at startup. Back up before updating an existing installation. Development checks use the single `npm run precheck` entry point.

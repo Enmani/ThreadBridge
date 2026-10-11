@@ -41,7 +41,7 @@ export function setupModelSettings(){
     get('summary-model').value=target?JSON.stringify([settings.connection,settings.model]):'';get('summary-model').disabled=busy||!data.items.length;
     get('summary-run').textContent=target?.kind==='client'?l.modelConfig:settings.running?l.pauseSummary:target?l.startSummary:l.connectModel;
     get('summary-run').disabled=busy||Boolean(target&&target.kind!=='client'&&(!data.indexEnabled||target.status!=='connected')&&!settings.running);
-    get('summary-status').textContent=!target?l.summaryNoModel:!data.indexEnabled?l.summaryIndexPaused:target.kind==='client'?l.summaryClient:settings.running?(data.pendingSummaries===0?l.summaryCurrent:l.summaryRunning):settings.completed||settings.error?l.summaryPaused:l.summaryReady;
+    get('summary-status').textContent=!target?l.summaryNoModel:!data.indexEnabled?l.summaryIndexPaused:target.kind==='client'?l.summaryClient:settings.running?(data.waitingForSync?l.summaryWaitingSync:data.pendingSummaries===0?l.summaryCurrent:l.summaryRunning):settings.completed||settings.error?l.summaryPaused:l.summaryReady;
     get('index-summary-mode').textContent=target?.kind==='client'?l.modelClientNote:target?l.summaryBackground:l.summaryNoModel;
     get('summary-destination').textContent=target?(target.kind==='client'?l.summaryClientDestination:(target.kind==='local'?l.summaryLocalDestination:l.summaryApiDestination)+' '+target.endpoint):'';
     if(document.activeElement!==get('summary-limit'))get('summary-limit').value=String(settings.dailyLimit);

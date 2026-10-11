@@ -16,7 +16,7 @@ async function dashboard(t,store){
   return paused=>fetch(base+'/api/control',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({paused})});
 }
 async function pendingFixture(t){
-  const f=await fixture(t);await sync(f.api,f.store,{max:0});
+  const f=await fixture(t);await sync(f.api,f.store,{max:0});f.store.meta('sync_phase','maintenance');
   f.store.meta('next_directory_at',Date.now()+900000);setSyncPaused(f.store,true);
   f.store.meta('next_run_at',Date.now()+900000);f.store.meta('next_request_at',Date.now()+90000);
   return f;

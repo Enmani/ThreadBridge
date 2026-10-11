@@ -23,7 +23,7 @@ test('adding a platform persists it without claiming connection; a paused worker
   assert.equal((await post(base,'/api/connections',{provider:'claude'})).status,409);
   assert.equal((await post(base,'/api/connections',{provider:'gemini',workspace:'wrong'})).status,400);
   const calls=[],rpc={closed:false,send(){},async request(path){calls.push(path);return {status:200,identity:'claude-user',workspace:'org'};}};
-  const worker=new BrowserWorker(rpc,c,workerConfig({db:':memory:',account:'test',provider:'claude',extensionId:'a'.repeat(32),paceMs:0}));
+  const worker=new BrowserWorker(rpc,c,workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:5,initialDirectoryPages:3,db:':memory:',account:'test',provider:'claude',extensionId:'a'.repeat(32),paceMs:0}));
   try{await worker.run();assert.deepEqual(calls,['/api/auth/session']);assert.equal(c.meta('connection_requested'),'0');assert.equal(c.meta('worker_state'),'paused');
     assert.equal(connectionStatus(c).connected,true);assert.equal((await fetch(base+'/api/connections').then(r=>r.json())).items[1].status,'connected');
   }finally{worker.close();}
@@ -32,7 +32,7 @@ test('adding a platform persists it without claiming connection; a paused worker
 
 test('failed login stays unconnected and newly added platforms remain listed on retry',async t=>{
   const map=stores(t),root=map.get('chatgpt'),c=map.get('claude');addConnection(root,{provider:'claude'},c);
-  const worker=new BrowserWorker({closed:false,send(){},async request(){return {status:401};}},c,workerConfig({db:':memory:',account:'test',provider:'claude',extensionId:'a'.repeat(32),paceMs:0}));
+  const worker=new BrowserWorker({closed:false,send(){},async request(){return {status:401};}},c,workerConfig({initialPaceMs:0,initialMinPaceMs:0,initialMaxPerRun:5,initialDirectoryPages:3,db:':memory:',account:'test',provider:'claude',extensionId:'a'.repeat(32),paceMs:0}));
   try{await worker.run();assert.equal(connectionStatus(c).status,'login-required');assert.equal(connectionStatus(c).connected,false);assert.equal(connections(root).length,2);}
   finally{worker.close();}
 });

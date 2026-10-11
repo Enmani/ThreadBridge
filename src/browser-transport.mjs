@@ -2,8 +2,8 @@ import {HttpTransport,ApiError,retryDelay} from './transport.mjs';
 import {SyncPaused} from './sync-control.mjs';
 import {providerId} from './providers.mjs';
 export class BrowserTransport extends HttpTransport {
-  constructor(rpc,{provider='chatgpt',authuser=0,paceMs=90000,successPaceMs=paceMs,workspace=null,nextRequestAt=0,onBeforeRequest=()=>{},onRequestStart=()=>{},onExchange=()=>{},onHistorySuccess=()=>{}}={}){
-    super({base:'http://127.0.0.1',pace:paceMs,retries:0});Object.assign(this,{rpc,successPaceMs,workspace,onBeforeRequest,onRequestStart,onExchange,onHistorySuccess,next:nextRequestAt,user:null});
+  constructor(rpc,{provider='chatgpt',authuser=0,paceMs=90000,successPaceMs=paceMs,paceAfterSuccess=()=>successPaceMs,workspace=null,nextRequestAt=0,onBeforeRequest=()=>{},onRequestStart=()=>{},onExchange=()=>{},onHistorySuccess=()=>{}}={}){
+    super({base:'http://127.0.0.1',pace:paceMs,retries:0});Object.assign(this,{rpc,paceAfterSuccess,workspace,onBeforeRequest,onRequestStart,onExchange,onHistorySuccess,next:nextRequestAt,user:null});
     this.abort=new AbortController();this.metrics={requests:0,queueMs:0,roundTripMs:0};
     this.provider=providerId(provider);this.authuser=authuser;
   }
@@ -46,8 +46,10 @@ export class BrowserTransport extends HttpTransport {
   }
   async request(path,options){try{
     const data=await super.request(path,options);
-    if(this.pace!==this.successPaceMs){this.pace=this.successPaceMs;this.next=Math.max(Date.now(),this.lastStartedAt+this.pace);this.onRequestStart(this.next);}
-    this.onHistorySuccess();return data;
+    this.onHistorySuccess();const pace=this.paceAfterSuccess();
+    if(!Number.isSafeInteger(pace)||pace<0)throw new Error('Invalid request pace');
+    if(this.pace!==pace){this.pace=pace;this.next=Math.max(Date.now(),this.lastStartedAt+this.pace);this.onRequestStart(this.next);}
+    return data;
   }catch(e){if(e.code==='SYNC_PAUSED'){this.stopped=e;throw e;}if(e.status>=500||!e.status){this.stopped=e.status?e:new ApiError(503,path);throw this.stopped;}throw e;}}
   pause(){this.stopped=new SyncPaused();this.abort.abort();}
   close(){this.user=null;this.abort.abort();}
